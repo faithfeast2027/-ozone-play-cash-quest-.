@@ -87,22 +87,14 @@ export async function startCheckout(productId: string, playerId: string): Promis
 }
 
 export async function creditSparks(playerId: string, delta: number, reason: string, reference?: string) {
-  const wallet = await fetchWallet(playerId);
-  if (!wallet) return;
-  await supabase
-    .from('wallet')
-    .update({
-      sparks: wallet.sparks + delta,
-      lifetime_sparks: wallet.lifetime_sparks + Math.max(delta, 0),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', wallet.id);
-  await supabase.from('spark_ledger').insert({
-    wallet_id: wallet.id,
-    delta,
-    reason,
-    reference,
+  // Balances are changed only by the server, which validates and caps every reward.
+  const { error } = await supabase.rpc('apply_spark_event', {
+    p_player_id: playerId,
+    p_reason: reason,
+    p_delta: Math.round(delta),
+    p_ref: reference ?? null,
   });
+  if (error) throw error;
 }
 
 export type Subscription = {
