@@ -68,7 +68,7 @@ type Theme = 'dark' | 'white' | 'red';
 
 const CHARACTERS: Character[] = [
   { id: 'mascot', name: 'Ozone', image: '/assets/Gemini_Generated_Image__(1).jpg', cost: 0, perk: 'Balanced runner', speed: 1 },
-  { id: 'volt', name: 'Volt', image: '/assets/Gemini_Generated_Image_(2).jpg', cost: 800, perk: '+15% run speed', speed: 1.15 },
+  { id: 'volt', name: 'Volt', image: '/assets/Gemini_Generated_Image__(2).jpg', cost: 800, perk: '+15% run speed', speed: 1.15 },
   { id: 'ember', name: 'Ember', image: '/assets/Gemini_Generated_Image_.jpg', cost: 1400, perk: '+25% run speed', speed: 1.25 },
 ];
 
