@@ -20,6 +20,7 @@ export type Wallet = {
   player_id: string;
   sparks: number;
   lifetime_sparks: number;
+  cashable_sparks?: number;
 };
 
 const PLAYER_ID_KEY = 'ozone_player_id';
@@ -46,7 +47,7 @@ export async function fetchProducts(): Promise<Product[]> {
 export async function fetchWallet(playerId: string): Promise<Wallet | null> {
   const { data, error } = await supabase
     .from('wallet')
-    .select('id, player_id, sparks, lifetime_sparks')
+    .select('id, player_id, sparks, lifetime_sparks, cashable_sparks')
     .eq('player_id', playerId)
     .maybeSingle();
   if (error) throw error;
@@ -59,7 +60,7 @@ export async function ensureWallet(playerId: string): Promise<Wallet> {
   const { data, error } = await supabase
     .from('wallet')
     .insert({ player_id: playerId, sparks: 0, lifetime_sparks: 0 })
-    .select('id, player_id, sparks, lifetime_sparks')
+    .select('id, player_id, sparks, lifetime_sparks, cashable_sparks')
     .single();
   if (error) throw error;
   return data;
