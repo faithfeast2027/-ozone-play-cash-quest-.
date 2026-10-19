@@ -405,7 +405,7 @@ function App() {
       <section className="content-grid">
         <div className="main-column">
           <div className="welcome-row">
-            <div><p className="eyebrow">SATURDAY, OCTOBER 18, 2026</p><h1>Make the city <em>yours.</em></h1><p className="intro">Discover signal drops, master skill runs, and turn your route into rewards.</p></div>
+            <div><p className="eyebrow">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}</p><h1>Make the city <em>yours.</em></h1><p className="intro">Discover signal drops, master skill runs, and turn your route into rewards.</p></div>
             <div className="streak-badge"><span className="streak-flame">◆</span><div><strong>0 day streak</strong><small>Start your first run today</small></div></div>
           </div>
 
@@ -474,7 +474,7 @@ function App() {
 
       {showFriends && session && <FindFriends currentUserId={session.user.id} onClose={() => setShowFriends(false)} />}
 
-      {showLiveMap && <LiveMap onClose={() => setShowLiveMap(false)} onWalletUpdate={refreshWallet} sparkBalance={sparkBalance} />}
+      {showLiveMap && <LiveMap onClose={() => setShowLiveMap(false)} onWalletUpdate={refreshWallet} sparkBalance={sparkBalance} playerId={playerId} />}
       {showWalk && <WalkEarn onClose={() => setShowWalk(false)} onWalletUpdate={refreshWallet} />}
 
       {showCharacters && <div className="modal-backdrop" onClick={() => setShowCharacters(false)}><div className="store-modal character-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowCharacters(false)}><X size={17} /></button><p className="eyebrow">CHARACTERS / PLAYABLE RUNNERS</p><h2>Pick your runner.</h2><p className="store-subtitle">Each character changes your run speed and style. Unlock with sparks you earn in-game.</p>{characterError && <div className="checkout-error">{characterError}</div>}<div className="store-grid">{CHARACTERS.map((c) => {
