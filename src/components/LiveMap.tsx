@@ -44,7 +44,7 @@ const cellPolygon = (c: Cell) => {
   return [[[w, s], [e, s], [e, n], [w, n], [w, s]]];
 };
 
-export default function LiveMap({ onClose, onWalletUpdate, sparkBalance }: { onClose: () => void; onWalletUpdate: () => void; sparkBalance: number }) {
+export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerId }: { onClose: () => void; onWalletUpdate: () => void; sparkBalance: number; playerId: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const meMarker = useRef<maplibregl.Marker | null>(null);
@@ -193,7 +193,7 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance }: { onC
   const doCheckIn = async () => {
     if (!fix) return;
     setBusy(true);
-    const { data, error } = await supabase.rpc('check_in', { p_lat: fix.lat, p_lng: fix.lng, p_accuracy: fix.acc });
+    const { data, error } = await supabase.rpc('check_in', { p_lat: fix.lat, p_lng: fix.lng, p_accuracy: fix.acc, p_player_id: playerId });
     setBusy(false);
     if (error) { showToast(false, error.message); return; }
     const r = data as { visitor_reward: number; owner_reward: number; owner_name: string | null };
@@ -204,7 +204,7 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance }: { onC
   const doBuy = async () => {
     if (!selected) return;
     setBusy(true);
-    const { error } = await supabase.rpc('buy_plot', { p_lat_i: selected.lat_i, p_lng_i: selected.lng_i, p_name: plotName });
+    const { error } = await supabase.rpc('buy_plot', { p_lat_i: selected.lat_i, p_lng_i: selected.lng_i, p_name: plotName, p_player_id: playerId });
     setBusy(false);
     if (error) { showToast(false, error.message); return; }
     showToast(true, 'Plot is yours. You earn sparks every time someone checks in here.');
