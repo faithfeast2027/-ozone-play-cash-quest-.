@@ -26,6 +26,7 @@ import {
   Zap,
   Gamepad2,
   Users,
+  Share2,
   Lock,
   Check,
   Footprints,
@@ -60,6 +61,7 @@ import NYCStarCrush from '@/components/NYCStarCrush';
 import TempleMarioRun from '@/components/TempleMarioRun';
 import FloppyAngryBird from '@/components/FloppyAngryBird';
 import Landing from '@/components/Landing';
+import InviteFriends from './components/InviteFriends';
 import FindFriends from '@/components/FindFriends';
 import LiveMap from '@/components/LiveMap';
 
@@ -74,6 +76,8 @@ const CHARACTERS: Character[] = [
 ];
 
 const OWNED_KEY = 'ozone_owned_characters';
+const REF_KEY = 'ozone_ref';
+(() => { try { const r = new URLSearchParams(window.location.search).get('ref'); if (r && /^[0-9a-f-]{36}$/i.test(r)) localStorage.setItem(REF_KEY, r); } catch { /* ignore */ } })();
 type Point = { id: number; x: number; y: number; label: string; venue: string; category: 'Cafe' | 'Market' | 'Restaurant' | 'Shop'; address: string; reward: number; tone: 'mint' | 'coral' | 'gold' };
 
 const points: Point[] = [
@@ -157,6 +161,7 @@ function App() {
   const [nameSaving, setNameSaving] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [showFriends, setShowFriends] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const mapRef = useRef<HTMLElement | null>(null);
 
   const playerId = useMemo(() => getOrCreatePlayerId(session?.user.id), [session?.user.id]);
@@ -279,6 +284,17 @@ function App() {
   }, [session?.user.id]);
 
   useEffect(() => {
+    const uid = session?.user.id;
+    const ref = localStorage.getItem(REF_KEY);
+    if (!uid || !ref) return;
+    localStorage.removeItem(REF_KEY);
+    if (ref === uid) return;
+    supabase.rpc('accept_referral', { p_ref: ref, p_player_id: playerId }).then(() => { fetchWallet(playerId).then((w) => { if (w) setWallet(w); }); });
+    if (window.location.search.includes('ref=')) window.history.replaceState({}, '', window.location.pathname);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
       setCheckoutSuccess(true);
@@ -394,12 +410,13 @@ function App() {
         </div>
         <div className="topbar-actions">
           <button className="theme-toggle" aria-label={`Switch theme. Current theme: ${theme}`} onClick={() => setTheme(theme === 'dark' ? 'white' : theme === 'white' ? 'red' : 'dark')}><span className="theme-toggle-icon">{theme === 'dark' ? <Moon size={14} /> : theme === 'white' ? <Sun size={14} /> : <Palette size={14} />}</span><span>{theme}</span></button>
+          <button className="icon-button" aria-label="Invite friends" onClick={() => setShowInvite(true)}><Share2 size={18} /></button>
           <button className="icon-button notification-button" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'} aria-expanded={showNotifications} onClick={toggleNotifications}><Bell size={19} />{unreadCount > 0 && <i />}</button>
           <button className="profile-chip" onClick={() => { setShowMenu(!showMenu); setShowNotifications(false); }}>
             <span className="avatar">{(username || session.user.email || '?').charAt(0).toUpperCase()}</span><span className="profile-name">{username ? username.toUpperCase() : 'SET NAME'}</span><ChevronRight size={16} />
           </button>
           {showNotifications && <div className="profile-menu" style={{ width: 280, zIndex: 30 }}><strong>Notifications</strong>{NOTIFICATIONS.map((n) => <div key={n.id} style={{ display: 'grid', gap: 3, paddingTop: 9, borderTop: '1px solid #26343a' }}><b style={{ fontSize: 12, fontWeight: 600 }}>{n.title}</b><span>{n.body}</span></div>)}<button onClick={() => setShowNotifications(false)}>Close</button></div>}
-          {showMenu && <div className="profile-menu" style={{ zIndex: 30 }}><strong>{username || 'Field Operator'}</strong><span>{session.user.email}</span>{!username && <div style={{ display: 'grid', gap: 6, marginTop: 6 }}><span>Pick your field name</span><input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="username" maxLength={20} style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 9, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 12 }} />{nameError && <span style={{ color: '#efad93' }}>{nameError}</span>}<button onClick={saveUsername} disabled={nameSaving}>{nameSaving ? 'Saving…' : 'Save name'}</button></div>}<button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowFriends(true); setShowMenu(false); }}><Users size={13} /> Find friends</button><button onClick={() => setShowMenu(false)}>Close menu</button></div>}
+          {showMenu && <div className="profile-menu" style={{ zIndex: 30 }}><strong>{username || 'Field Operator'}</strong><span>{session.user.email}</span>{!username && <div style={{ display: 'grid', gap: 6, marginTop: 6 }}><span>Pick your field name</span><input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="username" maxLength={20} style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 9, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 12 }} />{nameError && <span style={{ color: '#efad93' }}>{nameError}</span>}<button onClick={saveUsername} disabled={nameSaving}>{nameSaving ? 'Saving…' : 'Save name'}</button></div>}<button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowInvite(true); setShowMenu(false); }}><Share2 size={13} /> Invite friends</button><button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowFriends(true); setShowMenu(false); }}><Users size={13} /> Find friends</button><button onClick={() => setShowMenu(false)}>Close menu</button></div>}
         </div>
       </header>
 
@@ -473,6 +490,7 @@ function App() {
 
       {showFloppy && <FloppyAngryBird character={activeCharacter} onClose={() => setShowFloppy(false)} onWalletUpdate={refreshWallet} />}
 
+      {showInvite && session && <InviteFriends userId={session.user.id} onClose={() => setShowInvite(false)} />}
       {showFriends && session && <FindFriends currentUserId={session.user.id} onClose={() => setShowFriends(false)} />}
 
       {showLiveMap && <LiveMap onClose={() => setShowLiveMap(false)} onWalletUpdate={refreshWallet} sparkBalance={sparkBalance} playerId={playerId} />}
