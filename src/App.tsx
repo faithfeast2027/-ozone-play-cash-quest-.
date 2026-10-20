@@ -53,6 +53,7 @@ import {
   type Withdrawal,
 } from '@/lib/supabase';
 import { supabase, openBillingPortal } from '@/lib/supabase';
+import { startAmbient, stopAmbient } from '@/lib/ambient';
 import SparkRunGame, { type Character } from '@/components/SparkRunGame';
 import WalkEarn from '@/components/WalkEarn';
 import MancalaIsland from '@/components/MancalaIsland';
@@ -162,6 +163,9 @@ function App() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [showFriends, setShowFriends] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [ambientOn, setAmbientOn] = useState(false);
+  const toggleAmbient = () => { if (ambientOn) { stopAmbient(); setAmbientOn(false); localStorage.setItem('ozone_ambient', '0'); } else { startAmbient(); setAmbientOn(true); localStorage.setItem('ozone_ambient', '1'); } };
+  useEffect(() => { if (localStorage.getItem('ozone_ambient') !== '1') return; const go = () => { startAmbient(); setAmbientOn(true); window.removeEventListener('pointerdown', go); }; window.addEventListener('pointerdown', go); return () => window.removeEventListener('pointerdown', go); }, []);
   const [dailyBonus, setDailyBonus] = useState<{ amount: number; streak: number } | null>(null);
   const [signups, setSignups] = useState<{ email: string; joined: string; username: string | null }[] | null>(null);
   const isAdmin = (session?.user.email ?? '').toLowerCase() === 'odrich217@gmail.com';
@@ -424,7 +428,7 @@ function App() {
         </div>
         <div className="topbar-actions">
           <button className="theme-toggle" aria-label={`Switch theme. Current theme: ${theme}`} onClick={() => setTheme(theme === 'dark' ? 'white' : theme === 'white' ? 'red' : 'dark')}><span className="theme-toggle-icon">{theme === 'dark' ? <Moon size={14} /> : theme === 'white' ? <Sun size={14} /> : <Palette size={14} />}</span><span>{theme}</span></button>
-          <button className="icon-button" aria-label="Invite friends" onClick={() => setShowInvite(true)}><Share2 size={18} /></button>
+          <button className="icon-button" aria-label={ambientOn ? 'Turn calming sounds off' : 'Turn calming sounds on'} title="Calming sounds" onClick={toggleAmbient} style={{ fontSize: 16 }}>{ambientOn ? '🔊' : '🔈'}</button><button className="icon-button" aria-label="Invite friends" onClick={() => setShowInvite(true)}><Share2 size={18} /></button>
           <button className="icon-button notification-button" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'} aria-expanded={showNotifications} onClick={toggleNotifications}><Bell size={19} />{unreadCount > 0 && <i />}</button>
           <button className="profile-chip" onClick={() => { setShowMenu(!showMenu); setShowNotifications(false); }}>
             <span className="avatar">{(username || session.user.email || '?').charAt(0).toUpperCase()}</span><span className="profile-name">{username ? username.toUpperCase() : 'SET NAME'}</span><ChevronRight size={16} />
