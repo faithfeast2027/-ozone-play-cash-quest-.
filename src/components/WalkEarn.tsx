@@ -199,7 +199,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
               <strong>Walk & Earn is a members-only feature</strong>
               <p>Subscribe to turn your real-world walks into sparks. Cancel anytime.</p>
               <button className="primary-button full" onClick={handleSubscribe} disabled={subscribing}>
-                {subscribing ? 'Redirecting…' : <>Subscribe · $4.99/mo <Sparkles size={15} /></>}
+                {subscribing ? 'Redirecting…' : <>Subscribe · $7.99/mo <Sparkles size={15} /></>}
               </button>
               <small>Billing handled securely by Stripe. Manage your plan anytime from this screen.</small>
             </div>
