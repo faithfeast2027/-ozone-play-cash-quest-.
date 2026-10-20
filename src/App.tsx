@@ -167,6 +167,22 @@ function App() {
   const toggleAmbient = () => { if (ambientOn) { stopAmbient(); setAmbientOn(false); localStorage.setItem('ozone_ambient', '0'); } else { startAmbient(); setAmbientOn(true); localStorage.setItem('ozone_ambient', '1'); } };
   useEffect(() => { if (localStorage.getItem('ozone_ambient') !== '1') return; const go = () => { startAmbient(); setAmbientOn(true); window.removeEventListener('pointerdown', go); }; window.addEventListener('pointerdown', go); return () => window.removeEventListener('pointerdown', go); }, []);
   const [dailyBonus, setDailyBonus] = useState<{ amount: number; streak: number } | null>(null);
+  const [streak, setStreak] = useState<{ days: number; today: boolean }>({ days: 0, today: false });
+  const loadStreak = async () => {
+    const { data } = await supabase.from('daily_bonus_claims').select('day, streak').order('day', { ascending: false }).limit(1);
+    const row = data?.[0] as { day: string; streak: number } | undefined;
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    const y = new Date(Date.now() - 86400000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    if (!row || (row.day !== today && row.day !== y)) setStreak({ days: 0, today: false });
+    else setStreak({ days: row.streak, today: row.day === today });
+  };
+  const claimStreak = async () => {
+    if (streak.today) { openMap(); return; }
+    const { data } = await supabase.rpc('claim_daily_bonus', { p_player_id: playerId });
+    const r = data as { claimed?: boolean; amount?: number; streak?: number } | null;
+    if (r?.claimed) { setDailyBonus({ amount: r.amount ?? 0, streak: r.streak ?? 1 }); fetchWallet(playerId).then((w) => { if (w) setWallet(w); }); setTimeout(() => setDailyBonus(null), 6000); }
+    loadStreak();
+  };
   const [signups, setSignups] = useState<{ email: string; joined: string; username: string | null }[] | null>(null);
   const isAdmin = (session?.user.email ?? '').toLowerCase() === 'odrich217@gmail.com';
   const openSignups = async () => { const { data, error } = await supabase.rpc('admin_signups'); if (error) { alert(error.message); return; } setSignups(data ?? []); };
@@ -297,6 +313,7 @@ function App() {
     supabase.rpc('claim_daily_bonus', { p_player_id: playerId }).then(({ data }) => {
       const r = data as { claimed?: boolean; amount?: number; streak?: number } | null;
       if (r?.claimed) { setDailyBonus({ amount: r.amount ?? 0, streak: r.streak ?? 1 }); fetchWallet(playerId).then((w) => { if (w) setWallet(w); }); setTimeout(() => setDailyBonus(null), 6000); }
+      loadStreak();
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user.id]);
@@ -442,7 +459,7 @@ function App() {
         <div className="main-column">
           <div className="welcome-row">
             <div><p className="eyebrow">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}</p><h1>Make the city <em>yours.</em></h1><p className="intro">Discover signal drops, master skill runs, and turn your route into rewards.</p></div>
-            <div className="streak-badge"><span className="streak-flame">◆</span><div><strong>0 day streak</strong><small>Start your first run today</small></div></div>
+            <button type="button" className="streak-badge" onClick={claimStreak} style={{ cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}><span className="streak-flame">◆</span><div><strong>{streak.days} day streak</strong><small>{streak.today ? 'Bonus claimed. Tap to explore' : streak.days ? 'Tap to claim today\'s bonus' : 'Tap to start your streak'}</small></div></button>
           </div>
 
           <div className="hero-card">
