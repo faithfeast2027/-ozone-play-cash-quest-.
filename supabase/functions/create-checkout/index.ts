@@ -81,7 +81,26 @@ serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const cfgs = await stripe.billingPortal.configurations.list({ limit: 1, active: true });
+      let configuration = cfgs.data[0]?.id;
+      if (!configuration) {
+        const cfg = await stripe.billingPortal.configurations.create({
+          business_profile: {
+            headline: "Ozone Play: manage your Walk & Earn membership",
+            privacy_policy_url: "https://ozone-cash-quest.netlify.app/terms.html#privacy",
+            terms_of_service_url: "https://ozone-cash-quest.netlify.app/terms.html",
+          },
+          features: {
+            customer_update: { enabled: true, allowed_updates: ["email"] },
+            invoice_history: { enabled: true },
+            payment_method_update: { enabled: true },
+            subscription_cancel: { enabled: true, mode: "at_period_end" },
+          },
+        });
+        configuration = cfg.id;
+      }
       const portal = await stripe.billingPortal.sessions.create({
+        configuration,
         customer: sub.stripe_customer_id,
         return_url: `${origin}/`,
       });
