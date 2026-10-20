@@ -8,7 +8,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+
+async function getSecret(name: string): Promise<string> {
+  const env = Deno.env.get(name) ?? "";
+  if (env) return env;
+  const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+  const { data } = await db.from("app_secrets").select("value").eq("name", name).maybeSingle();
+  return (data?.value as string) ?? "";
+}
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -33,7 +40,7 @@ serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+    const stripe = new Stripe(await getSecret("STRIPE_SECRET_KEY"), { apiVersion: "2023-10-16" });
     const origin = req.headers.get("origin") ?? "https://example.com";
 
     if (body.mode === "subscription") {
