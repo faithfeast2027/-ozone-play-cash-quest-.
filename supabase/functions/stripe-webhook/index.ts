@@ -8,8 +8,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
-const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
+
+async function getSecret(name: string): Promise<string> {
+  const env = Deno.env.get(name) ?? "";
+  if (env) return env;
+  const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+  const { data } = await db.from("app_secrets").select("value").eq("name", name).maybeSingle();
+  return (data?.value as string) ?? "";
+}
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -35,10 +41,10 @@ serve(async (req: Request) => {
   }
 
   try {
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+    const stripe = new Stripe(await getSecret("STRIPE_SECRET_KEY"), { apiVersion: "2023-10-16" });
     const signature = req.headers.get("stripe-signature") ?? "";
     const body = await req.text();
-    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+    const event = await stripe.webhooks.constructEventAsync(body, signature, await getSecret("STRIPE_WEBHOOK_SECRET"));
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     if (event.type === "checkout.session.completed") {
