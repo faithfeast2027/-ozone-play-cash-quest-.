@@ -52,7 +52,7 @@ import {
   type Wallet as WalletRow,
   type Withdrawal,
 } from '@/lib/supabase';
-import { supabase } from '@/lib/supabase';
+import { supabase, openBillingPortal } from '@/lib/supabase';
 import SparkRunGame, { type Character } from '@/components/SparkRunGame';
 import WalkEarn from '@/components/WalkEarn';
 import MancalaIsland from '@/components/MancalaIsland';
@@ -162,6 +162,11 @@ function App() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [showFriends, setShowFriends] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [dailyBonus, setDailyBonus] = useState<{ amount: number; streak: number } | null>(null);
+  const [signups, setSignups] = useState<{ email: string; joined: string; username: string | null }[] | null>(null);
+  const isAdmin = (session?.user.email ?? '').toLowerCase() === 'odrich217@gmail.com';
+  const openSignups = async () => { const { data, error } = await supabase.rpc('admin_signups'); if (error) { alert(error.message); return; } setSignups(data ?? []); };
+  const manageMembership = async () => { try { window.location.href = await openBillingPortal(); } catch (e) { alert(e instanceof Error && e.message.includes('No subscription') ? 'No active membership yet. Join Walk & Earn first.' : (e instanceof Error ? e.message : 'Could not open billing.')); } };
   const mapRef = useRef<HTMLElement | null>(null);
 
   const playerId = useMemo(() => getOrCreatePlayerId(session?.user.id), [session?.user.id]);
@@ -281,6 +286,15 @@ function App() {
     if (!session) return;
     requestLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id]);
+
+  useEffect(() => {
+    if (!session?.user.id) return;
+    supabase.rpc('claim_daily_bonus', { p_player_id: playerId }).then(({ data }) => {
+      const r = data as { claimed?: boolean; amount?: number; streak?: number } | null;
+      if (r?.claimed) { setDailyBonus({ amount: r.amount ?? 0, streak: r.streak ?? 1 }); fetchWallet(playerId).then((w) => { if (w) setWallet(w); }); setTimeout(() => setDailyBonus(null), 6000); }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user.id]);
 
   useEffect(() => {
@@ -416,7 +430,7 @@ function App() {
             <span className="avatar">{(username || session.user.email || '?').charAt(0).toUpperCase()}</span><span className="profile-name">{username ? username.toUpperCase() : 'SET NAME'}</span><ChevronRight size={16} />
           </button>
           {showNotifications && <div className="profile-menu" style={{ width: 280, zIndex: 30 }}><strong>Notifications</strong>{NOTIFICATIONS.map((n) => <div key={n.id} style={{ display: 'grid', gap: 3, paddingTop: 9, borderTop: '1px solid #26343a' }}><b style={{ fontSize: 12, fontWeight: 600 }}>{n.title}</b><span>{n.body}</span></div>)}<button onClick={() => setShowNotifications(false)}>Close</button></div>}
-          {showMenu && <div className="profile-menu" style={{ zIndex: 30 }}><strong>{username || 'Field Operator'}</strong><span>{session.user.email}</span>{!username && <div style={{ display: 'grid', gap: 6, marginTop: 6 }}><span>Pick your field name</span><input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="username" maxLength={20} style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 9, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 12 }} />{nameError && <span style={{ color: '#efad93' }}>{nameError}</span>}<button onClick={saveUsername} disabled={nameSaving}>{nameSaving ? 'Saving…' : 'Save name'}</button></div>}<button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowInvite(true); setShowMenu(false); }}><Share2 size={13} /> Invite friends</button><button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowFriends(true); setShowMenu(false); }}><Users size={13} /> Find friends</button><button onClick={() => setShowMenu(false)}>Close menu</button></div>}
+          {showMenu && <div className="profile-menu" style={{ zIndex: 30 }}><strong>{username || 'Field Operator'}</strong><span>{session.user.email}</span>{!username && <div style={{ display: 'grid', gap: 6, marginTop: 6 }}><span>Pick your field name</span><input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="username" maxLength={20} style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 9, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 12 }} />{nameError && <span style={{ color: '#efad93' }}>{nameError}</span>}<button onClick={saveUsername} disabled={nameSaving}>{nameSaving ? 'Saving…' : 'Save name'}</button></div>}<button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowInvite(true); setShowMenu(false); }}><Share2 size={13} /> Invite friends</button><button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowFriends(true); setShowMenu(false); }}><Users size={13} /> Find friends</button><button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); manageMembership(); }}>Manage membership</button><a href="/terms.html" style={{ fontSize: 12, color: 'inherit', opacity: .8, padding: '4px 0' }}>Terms, privacy &amp; refunds</a>{isAdmin && <button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); openSignups(); }}>📈 Player signups</button>}<button onClick={() => setShowMenu(false)}>Close menu</button></div>}
         </div>
       </header>
 
@@ -515,6 +529,8 @@ function App() {
 
       {showStore && <div className="modal-backdrop" onClick={() => setShowStore(false)}><div className="store-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowStore(false)}><X size={17} /></button><p className="eyebrow">STORE / SPARK PACKS</p><h2>Fuel your field.</h2><p className="store-subtitle">Sparks power drops, streaks, and skill runs. Secure checkout via Stripe.</p>{checkoutError && <div className="checkout-error">{checkoutError}</div>}<div className="store-grid">{products.map((product) => <button className="store-card" key={product.id} onClick={() => handleBuy(product)} disabled={checkoutLoadingId === product.id}><div className="store-card-top"><Sparkles size={18} /><span>{product.sparks.toLocaleString()} sparks</span></div><div className="store-card-body"><strong>{product.name}</strong><small>{product.tagline}</small></div><div className="store-card-foot"><span className="store-price">${(product.price_cents / 100).toFixed(2)}</span>{checkoutLoadingId === product.id ? <Loader2 size={16} className="spin" /> : <ChevronRight size={16} />}</div></button>)}</div><div className="store-trust"><ShieldCheck size={15} /><span>Payments secured by Stripe. Sparks credited after confirmation.</span></div></div></div>}
 
+      {dailyBonus && <div className="checkout-toast" onClick={() => setDailyBonus(null)}><Sparkles size={18} /><span>Daily bonus +{dailyBonus.amount} sparks · {dailyBonus.streak}-day streak{dailyBonus.streak < 7 ? ' (come back tomorrow for more)' : ''}</span></div>}
+      {signups && <div className="store-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#000a', display: 'grid', placeItems: 'center', padding: 16 }} onClick={() => setSignups(null)}><div className="store-modal" onClick={(e) => e.stopPropagation()}><h2>Players · {signups.length}</h2><p className="store-subtitle">{signups.filter((u) => Date.now() - new Date(u.joined).getTime() < 86400000).length} joined in the last 24 h</p><div style={{ display: 'grid', gap: 8 }}>{signups.map((u) => <div key={u.email + u.joined} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, borderBottom: '1px solid #2b3a40', paddingBottom: 6 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.username ? <b>{u.username} </b> : null}{u.email}</span><span style={{ opacity: .7, whiteSpace: 'nowrap' }}>{new Date(u.joined).toLocaleDateString()}</span></div>)}</div><button style={{ marginTop: 16 }} onClick={() => setSignups(null)}>Close</button></div></div>}
       {checkoutSuccess && <div className="checkout-toast" onClick={() => setCheckoutSuccess(false)}><CheckCircle2 size={18} /><span>Payment received — sparks credited to your wallet.</span></div>}
     </main>
   );
