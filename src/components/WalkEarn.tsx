@@ -12,9 +12,9 @@ import {
   Clock,
 } from 'lucide-react';
 import {
-  creditSparks,
-  endWalkSession,
   fetchActiveWalkSession,
+  fetchWalkHistory,
+  supabase,
   fetchSubscription,
   fetchWallet,
   getOrCreatePlayerId,
@@ -27,7 +27,9 @@ import {
 } from '@/lib/supabase';
 
 const STEPS_PER_METER = 1.35;
-const SPARKS_PER_STEP = 1;
+const STEPS_PER_SPARK = 100;
+const DAILY_WALK_CAP = 150;
+const MAX_SPEED_MS = 3.4;
 
 type Props = {
   onClose: () => void;
@@ -46,7 +48,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
   const [history, setHistory] = useState<WalkSession[]>([]);
 
   const watchIdRef = useRef<number | null>(null);
-  const lastPosRef = useRef<{ lat: number; lon: number } | null>(null);
+  const lastPosRef = useRef<{ lat: number; lon: number; t: number } | null>(null);
   const stepsRef = useRef(0);
   const distRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
@@ -110,7 +112,8 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
         const last = lastPosRef.current;
         if (last) {
           const d = haversine(last.lat, last.lon, latitude, longitude);
-          if (d > 1 && d < 200) {
+          const dt = Math.max((pos.timestamp - last.t) / 1000, 0.5);
+          if (d > 1 && d < 200 && d / dt <= MAX_SPEED_MS) {
             distRef.current += d;
             stepsRef.current += Math.round(d * STEPS_PER_METER);
             setDistanceM(Math.round(distRef.current));
@@ -120,7 +123,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
             }
           }
         }
-        lastPosRef.current = { lat: latitude, lon: longitude };
+        lastPosRef.current = { lat: latitude, lon: longitude, t: pos.timestamp };
       },
       () => {
         setGpsStatus('denied');
@@ -132,17 +135,16 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
 
   const finishWalk = async () => {
     stopGps();
-    const earned = Math.round(stepsRef.current * SPARKS_PER_STEP);
     if (sessionIdRef.current) {
       try {
-        await endWalkSession(sessionIdRef.current, earned);
-        if (earned > 0) {
-          await creditSparks(playerIdRef.current, earned, 'walk_earn', sessionIdRef.current);
-          await fetchWallet(playerIdRef.current);
-          onWalletUpdate?.();
-        }
-      } catch {
-        setError('Could not save your walk.');
+        const { data, error: bankErr } = await supabase.rpc('bank_walk', { p_session: sessionIdRef.current, p_player_id: playerIdRef.current });
+        if (bankErr) throw bankErr;
+        const r = data as { sparks: number; today: number; cap: number };
+        if (r.sparks > 0) { await fetchWallet(playerIdRef.current); onWalletUpdate?.(); }
+        else if (r.today >= r.cap) setError(`Daily walk limit reached (${r.cap} sparks). Come back tomorrow!`);
+        fetchWalkHistory().then(setHistory).catch(() => {});
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not save your walk.');
       }
     }
     setSession(null);
@@ -178,7 +180,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
   };
 
   const distanceKm = (distanceM / 1000).toFixed(2);
-  const sparksEarned = Math.round(steps * SPARKS_PER_STEP);
+  const sparksEarned = Math.min(Math.floor(steps / STEPS_PER_SPARK), DAILY_WALK_CAP);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -186,7 +188,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
         <button className="modal-close" onClick={onClose}><X size={17} /></button>
         <p className="eyebrow">MEMBERSHIP / WALK & EARN</p>
         <h2>Walk to earn sparks.</h2>
-        <p className="store-subtitle">Subscribed members earn sparks for every step taken in the real world. Start a walk, keep moving, and bank sparks when you finish.</p>
+        <p className="store-subtitle">Members earn 1 spark per 100 steps, up to 150 sparks a day. Walking or jogging only, and sparks bank when you finish. Walk sparks are for play and can't be cashed out.</p>
 
         {error && <div className="checkout-error">{error}</div>}
 
