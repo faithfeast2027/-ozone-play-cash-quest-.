@@ -123,7 +123,7 @@ export async function fetchSubscription(): Promise<Subscription | null> {
   return data;
 }
 
-export async function startSubscriptionCheckout(): Promise<string> {
+export async function startSubscriptionCheckout(tier: 'walk' | 'stride' | 'marathon' = 'walk'): Promise<string> {
   const url = `${supabaseUrl}/functions/v1/create-checkout`;
   const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(url, {
@@ -132,7 +132,7 @@ export async function startSubscriptionCheckout(): Promise<string> {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session?.access_token ?? supabaseAnonKey}`,
     },
-    body: JSON.stringify({ mode: 'subscription' }),
+    body: JSON.stringify({ mode: 'subscription', tier }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
