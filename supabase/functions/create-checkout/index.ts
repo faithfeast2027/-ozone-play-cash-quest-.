@@ -44,26 +44,38 @@ serve(async (req: Request) => {
     const origin = req.headers.get("origin") ?? "https://example.com";
 
     if (body.mode === "subscription") {
-      if (!WALK_EARN_PRICE_ID) {
+      const tier = ["walk", "stride", "marathon"].includes(body.tier) ? body.tier : "walk";
+      const priceId = tier === "stride" ? await getSecret("STRIPE_STRIDE_PRICE_ID")
+        : tier === "marathon" ? await getSecret("STRIPE_MARATHON_PRICE_ID") : WALK_EARN_PRICE_ID;
+      if (!priceId) {
         return new Response(JSON.stringify({ error: "Walk & Earn plan not configured" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const { data: existing } = await supabase.from("subscriptions")
+        .select("status, stripe_subscription_id").eq("user_id", user.id).maybeSingle();
+      if (existing?.status === "active" && existing.stripe_subscription_id) {
+        // Already a member: switch tiers on the same subscription (prorated) instead of a second one.
+        const current = await stripe.subscriptions.retrieve(existing.stripe_subscription_id);
+        await stripe.subscriptions.update(current.id, {
+          items: [{ id: current.items.data[0].id, price: priceId }],
+          proration_behavior: "create_prorations",
+          metadata: { user_id: user.id, plan: tier },
+        });
+        await supabase.from("subscriptions").update({ plan: tier, updated_at: new Date().toISOString() }).eq("user_id", user.id);
+        return new Response(JSON.stringify({ url: `${origin}/?subscribe=success` }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
-        line_items: [{ quantity: 1, price: WALK_EARN_PRICE_ID }],
+        line_items: [{ quantity: 1, price: priceId }],
         success_url: `${origin}/?subscribe=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/?subscribe=cancel`,
-        metadata: { user_id: user.id, plan: "walk_earn_monthly" },
+        metadata: { user_id: user.id, plan: tier },
+        subscription_data: { metadata: { user_id: user.id, plan: tier } },
       });
-      await supabase.from("subscriptions").upsert({
-        user_id: user.id,
-        status: "trialing",
-        plan: "walk_earn_monthly",
-        stripe_customer_id: null,
-        stripe_subscription_id: null,
-      }, { onConflict: "user_id" });
       return new Response(JSON.stringify({ url: session.url }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
