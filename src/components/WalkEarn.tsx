@@ -188,7 +188,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
         <button className="modal-close" onClick={onClose}><X size={17} /></button>
         <p className="eyebrow">MEMBERSHIP / WALK & EARN</p>
         <h2>Walk to earn sparks.</h2>
-        <p className="store-subtitle">Members earn 1 spark per 100 steps, up to 150 sparks a day. Walking or jogging only, and sparks bank when you finish. Walk sparks are for play and can't be cashed out.</p>
+        <p className="store-subtitle">Members earn 1 spark per 100 steps, up to 150 sparks a day. Walking or jogging only, and sparks bank when you finish. Up to 400 walk sparks a month ($4) are cash-eligible for payouts.</p>
 
         {error && <div className="checkout-error">{error}</div>}
 
