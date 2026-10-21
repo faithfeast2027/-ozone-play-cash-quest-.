@@ -19,17 +19,23 @@ async function getSecret(name: string): Promise<string> {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-async function syncSubscription(stripe: Stripe, supabase: ReturnType<typeof createClient>, subscriptionId: string) {
+async function syncSubscription(stripe: Stripe, supabase: ReturnType<typeof createClient>, subscriptionId: string, fallbackUserId?: string) {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const userId = subscription.metadata?.user_id;
+  let userId = subscription.metadata?.user_id || fallbackUserId;
+  if (!userId) {
+    const { data } = await supabase.from("subscriptions").select("user_id").eq("stripe_subscription_id", subscription.id).maybeSingle();
+    userId = data?.user_id as string | undefined;
+  }
   if (!userId) return;
+  const amount = subscription.items.data[0]?.price?.unit_amount ?? 0;
+  const tier = amount >= 2499 ? "marathon" : amount >= 1499 ? "stride" : "walk";
   const status = subscription.status === "active" || subscription.status === "trialing" ? "active" : subscription.status;
   await supabase.from("subscriptions").upsert({
     user_id: userId,
     stripe_subscription_id: subscription.id,
     stripe_customer_id: subscription.customer as string,
     status,
-    plan: subscription.metadata?.plan ?? "walk_earn_monthly",
+    plan: tier,
     current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
     updated_at: new Date().toISOString(),
   }, { onConflict: "user_id" });
@@ -53,7 +59,7 @@ serve(async (req: Request) => {
       if (session.mode === "subscription") {
         const userId = session.metadata?.user_id;
         if (userId && session.subscription) {
-          await syncSubscription(stripe, supabase, session.subscription as string);
+          await syncSubscription(stripe, supabase, session.subscription as string, userId);
         }
         return new Response(JSON.stringify({ received: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
