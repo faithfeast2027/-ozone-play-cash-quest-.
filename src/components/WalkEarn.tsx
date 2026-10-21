@@ -28,7 +28,12 @@ import {
 
 const STEPS_PER_METER = 1.35;
 const STEPS_PER_SPARK = 100;
-const DAILY_WALK_CAP = 150;
+const TIERS = [
+  { id: 'walk', name: 'Walk', price: '$7.99', day: 150, cash: 6 },
+  { id: 'stride', name: 'Stride', price: '$14.99', day: 250, cash: 12 },
+  { id: 'marathon', name: 'Marathon', price: '$24.99', day: 400, cash: 20 },
+] as const;
+type TierId = (typeof TIERS)[number]['id'];
 const MAX_SPEED_MS = 3.4;
 
 type Props = {
@@ -55,6 +60,8 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
   const playerIdRef = useRef(getOrCreatePlayerId());
 
   const isMember = subscription?.status === 'active';
+  const myTier = TIERS.find((t) => t.id === subscription?.plan) ?? TIERS[0];
+  const DAILY_WALK_CAP = myTier.day;
 
   useEffect(() => {
     (async () => {
@@ -157,11 +164,11 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
     fetchActiveWalkSession().then(() => {}).catch(() => {});
   };
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = async (tier: TierId = 'walk') => {
     setError(null);
     setSubscribing(true);
     try {
-      const url = await startSubscriptionCheckout();
+      const url = await startSubscriptionCheckout(tier);
       window.location.href = url;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Subscription setup failed.');
@@ -188,7 +195,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
         <button className="modal-close" onClick={onClose}><X size={17} /></button>
         <p className="eyebrow">MEMBERSHIP / WALK & EARN</p>
         <h2>Walk to earn sparks.</h2>
-        <p className="store-subtitle">Members earn 1 spark per 100 steps, up to 150 sparks a day. Walking or jogging only, and sparks bank when you finish. Up to 600 walk sparks a month ($6) are cash-eligible for payouts.</p>
+        <p className="store-subtitle">Members earn 1 spark per 100 steps at walking or jogging speed, and sparks bank when you finish. Higher plans earn more per day and cash out more each month.</p>
 
         {error && <div className="checkout-error">{error}</div>}
 
@@ -199,10 +206,15 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
             <div className="gate-card">
               <Crown size={26} />
               <strong>Walk & Earn is a members-only feature</strong>
-              <p>Subscribe to turn your real-world walks into sparks. Cancel anytime.</p>
-              <button className="primary-button full" onClick={handleSubscribe} disabled={subscribing}>
-                {subscribing ? 'Redirecting…' : <>Subscribe · $7.99/mo <Sparkles size={15} /></>}
-              </button>
+              <p>Pick a plan. Earn more, cash out more. Cancel anytime.</p>
+              <div style={{ display: 'grid', gap: 8, width: '100%' }}>
+                {TIERS.map((t) => (
+                  <button key={t.id} className={t.id === 'stride' ? 'primary-button full' : 'full'} onClick={() => handleSubscribe(t.id)} disabled={subscribing} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '12px 14px' }}>
+                    <span style={{ textAlign: 'left' }}><b>{t.name} · {t.price}/mo</b><br /><small>{t.day} walk sparks/day · cash out up to ${t.cash}/mo</small></span>
+                    {subscribing ? <span>…</span> : <Sparkles size={15} />}
+                  </button>
+                ))}
+              </div>
               <small>Billing handled securely by Stripe. Manage your plan anytime from this screen.</small>
             </div>
           </div>
@@ -273,6 +285,14 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
               )}
             </div>
 
+            <div style={{ display: 'grid', gap: 6, marginBottom: 10 }}>
+              <small>Your plan: <b>{myTier.name}</b> · {myTier.day} walk sparks/day · cash out up to ${myTier.cash}/mo</small>
+              {TIERS.filter((t) => t.day > myTier.day).map((t) => (
+                <button key={t.id} onClick={() => { if (confirm(`Switch to ${t.name} for ${t.price}/mo? Stripe prorates the difference.`)) handleSubscribe(t.id); }} disabled={subscribing}>
+                  Upgrade to {t.name} · {t.price}/mo ({t.day}/day, ${t.cash}/mo cash)
+                </button>
+              ))}
+            </div>
             <button className="portal-link" onClick={handlePortal}>
               <RotateCcw size={13} /> Manage your subscription
             </button>
