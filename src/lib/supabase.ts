@@ -212,9 +212,11 @@ export type Withdrawal = {
   processed_at: string | null;
 };
 
-export async function requestWithdrawal(sparksToRedeem: number): Promise<{ id: string }> {
+export async function requestWithdrawal(sparksToRedeem: number, method: string, handle: string): Promise<{ id: string }> {
   const { data, error } = await supabase.rpc('request_withdrawal', {
     sparks_to_redeem: sparksToRedeem,
+    p_method: method,
+    p_handle: handle,
   });
   if (error) throw error;
   return { id: data as string };
