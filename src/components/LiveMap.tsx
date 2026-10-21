@@ -8,7 +8,10 @@ const CELL = 0.0005; // ~55 m grid
 const PLOT_PRICE = 500;
 const FALLBACK: [number, number] = [-84.388, 33.749]; // Atlanta
 
-type Plot = { cell_key: string; lat_i: number; lng_i: number; owner_id: string; owner_name: string | null; name: string | null; visits: number; earned: number };
+type Plot = { cell_key: string; lat_i: number; lng_i: number; owner_id: string; owner_name: string | null; name: string | null; visits: number; earned: number; boost_until: string | null };
+type Drop = { id: string; cell_key: string; lat_i: number; lng_i: number; business_name: string; bonus: number };
+const isBoosted = (p?: Plot) => !!p?.boost_until && new Date(p.boost_until).getTime() > Date.now();
+const BOOST_PRICE = 150;
 type Cell = { lat_i: number; lng_i: number };
 type Fix = { lat: number; lng: number; acc: number };
 
@@ -50,6 +53,7 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
   const meMarker = useRef<maplibregl.Marker | null>(null);
   const watchId = useRef<number | null>(null);
   const plotsRef = useRef<Map<string, Plot>>(new Map());
+  const dropsRef = useRef<Map<string, Drop>>(new Map());
   const selectedRef = useRef<Cell | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [style, setStyle] = useState<'sat' | '3d'>('sat');
@@ -73,6 +77,7 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
     const zoom = map.getZoom();
     const features: GeoJSON.Feature[] = [];
     const seen = new Set<string>();
+    const kindOf = (k: string, p?: Plot) => dropsRef.current.has(k) ? 'sponsor' : p ? (isBoosted(p) ? 'boosted' : p.owner_id === userId ? 'mine' : 'owned') : 'free';
     if (zoom >= 15.5) {
       const b = map.getBounds();
       const s = Math.floor(b.getSouth() / CELL), n = Math.floor(b.getNorth() / CELL);
@@ -81,13 +86,18 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
         for (let la = s; la <= n; la++) for (let ln = w; ln <= e; ln++) {
           const c = { lat_i: la, lng_i: ln }; const k = keyOf(c); seen.add(k);
           const p = plotsRef.current.get(k);
-          features.push({ type: 'Feature', properties: { key: k, kind: p ? (p.owner_id === userId ? 'mine' : 'owned') : 'free' }, geometry: { type: 'Polygon', coordinates: cellPolygon(c) } });
+          features.push({ type: 'Feature', properties: { key: k, kind: kindOf(k, p) }, geometry: { type: 'Polygon', coordinates: cellPolygon(c) } });
         }
       }
     }
     plotsRef.current.forEach((p, k) => {
       if (seen.has(k)) return;
-      features.push({ type: 'Feature', properties: { key: k, kind: p.owner_id === userId ? 'mine' : 'owned' }, geometry: { type: 'Polygon', coordinates: cellPolygon(p) } });
+      seen.add(k);
+      features.push({ type: 'Feature', properties: { key: k, kind: kindOf(k, p) }, geometry: { type: 'Polygon', coordinates: cellPolygon(p) } });
+    });
+    dropsRef.current.forEach((d, k) => {
+      if (seen.has(k)) return;
+      features.push({ type: 'Feature', properties: { key: k, kind: 'sponsor' }, geometry: { type: 'Polygon', coordinates: cellPolygon(d) } });
     });
     const sel = selectedRef.current;
     const selFeatures: GeoJSON.Feature[] = sel ? [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: cellPolygon(sel) } }] : [];
@@ -100,11 +110,15 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
     if (!map) return;
     const b = map.getBounds();
     const { data } = await supabase.from('plots')
-      .select('cell_key, lat_i, lng_i, owner_id, owner_name, name, visits, earned')
+      .select('cell_key, lat_i, lng_i, owner_id, owner_name, name, visits, earned, boost_until')
       .gte('lat_i', Math.floor(b.getSouth() / CELL)).lte('lat_i', Math.floor(b.getNorth() / CELL))
       .gte('lng_i', Math.floor(b.getWest() / CELL)).lte('lng_i', Math.floor(b.getEast() / CELL))
       .limit(1000);
     (data ?? []).forEach((p) => plotsRef.current.set(p.cell_key, p as Plot));
+    const { data: drops } = await supabase.from('sponsored_drops').select('id, cell_key, lat_i, lng_i, business_name, bonus')
+      .gte('lat_i', Math.floor(b.getSouth() / CELL)).lte('lat_i', Math.floor(b.getNorth() / CELL))
+      .gte('lng_i', Math.floor(b.getWest() / CELL)).lte('lng_i', Math.floor(b.getEast() / CELL)).limit(200);
+    dropsRef.current = new Map((drops ?? []).map((d) => [d.cell_key, d as Drop]));
     renderLayers(); force((x) => x + 1);
   }, [renderLayers]);
 
@@ -114,12 +128,12 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
     if (!map.getSource('cells')) map.addSource('cells', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     if (!map.getSource('selected')) map.addSource('selected', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     if (!map.getLayer('cells-fill')) map.addLayer({ id: 'cells-fill', type: 'fill', source: 'cells', paint: {
-      'fill-color': ['match', ['get', 'kind'], 'mine', '#b9f17b', 'owned', '#e58a69', '#ffffff'],
-      'fill-opacity': ['match', ['get', 'kind'], 'mine', 0.45, 'owned', 0.4, 0.04],
+      'fill-color': ['match', ['get', 'kind'], 'mine', '#b9f17b', 'owned', '#e58a69', 'boosted', '#ffd23f', 'sponsor', '#b07cff', '#ffffff'],
+      'fill-opacity': ['match', ['get', 'kind'], 'mine', 0.45, 'owned', 0.4, 'boosted', 0.6, 'sponsor', 0.55, 0.04],
     } });
     if (!map.getLayer('cells-line')) map.addLayer({ id: 'cells-line', type: 'line', source: 'cells', paint: {
-      'line-color': ['match', ['get', 'kind'], 'mine', '#d4fa9e', 'owned', '#f2a283', '#b9f17b'],
-      'line-width': ['match', ['get', 'kind'], 'free', 0.5, 1.5], 'line-opacity': 0.7,
+      'line-color': ['match', ['get', 'kind'], 'mine', '#d4fa9e', 'owned', '#f2a283', 'boosted', '#fff36b', 'sponsor', '#d7b8ff', '#b9f17b'],
+      'line-width': ['match', ['get', 'kind'], 'free', 0.5, 'boosted', 3, 'sponsor', 3, 1.5], 'line-opacity': 0.8,
     } });
     if (!map.getLayer('selected-line')) map.addLayer({ id: 'selected-line', type: 'line', source: 'selected', paint: { 'line-color': '#fff36b', 'line-width': 3 } });
     renderLayers();
@@ -196,8 +210,19 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
     const { data, error } = await supabase.rpc('check_in', { p_lat: fix.lat, p_lng: fix.lng, p_accuracy: fix.acc, p_player_id: playerId });
     setBusy(false);
     if (error) { showToast(false, error.message); return; }
-    const r = data as { visitor_reward: number; owner_reward: number; owner_name: string | null };
-    showToast(true, `+${r.visitor_reward} sparks for showing up${r.owner_name ? ` · ${r.owner_name} earned ${r.owner_reward}` : ''}`);
+    const r = data as { visitor_reward: number; owner_reward: number; owner_name: string | null; boost_bonus?: number; sponsor_bonus?: number; sponsor_name?: string | null };
+    const total = r.visitor_reward + (r.boost_bonus ?? 0) + (r.sponsor_bonus ?? 0);
+    showToast(true, `+${total} sparks for showing up${r.sponsor_bonus ? ` · ${r.sponsor_bonus} bonus from ${r.sponsor_name}` : ''}${r.boost_bonus ? ' · Rush Hour bonus!' : ''}${r.owner_name ? ` · ${r.owner_name} earned ${r.owner_reward}` : ''}`);
+    onWalletUpdate(); loadPlots();
+  };
+
+  const doBoost = async () => {
+    if (!selKey) return;
+    setBusy(true);
+    const { error } = await supabase.rpc('boost_plot', { p_cell_key: selKey, p_player_id: playerId });
+    setBusy(false);
+    if (error) { showToast(false, error.message); return; }
+    showToast(true, 'Rush Hour is on! Your plot glows gold for 3 hours and visitors earn bonus sparks.');
     onWalletUpdate(); loadPlots();
   };
 
@@ -247,11 +272,13 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
             </small>
             <button onClick={() => { selectedRef.current = null; setSelected(null); renderLayers(); }} style={{ background: 'transparent', color: '#9badab' }}><X size={16} /></button>
           </div>
+          {selKey && dropsRef.current.get(selKey) && <p style={{ margin: '8px 0 0', fontSize: 13, color: '#d7b8ff' }}>⭐ Sponsored by <strong>{dropsRef.current.get(selKey)!.business_name}</strong> · +{dropsRef.current.get(selKey)!.bonus} bonus sparks for checking in</p>}
+          {isBoosted(selPlot) && <p style={{ margin: '8px 0 0', fontSize: 13, color: '#ffd23f' }}>⚡ Rush Hour until {new Date(selPlot!.boost_until!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · +5 bonus sparks for visitors</p>}
           {selPlot ? (
             <p style={{ margin: '8px 0 12px', fontSize: 14 }}><strong>{selPlot.name ?? 'Plot'}</strong> · owned by {selPlot.owner_id === userId ? 'you' : (selPlot.owner_name ?? 'a player')} · {selPlot.visits} visits{selPlot.owner_id === userId ? ` · ${selPlot.earned} sparks earned` : ''}</p>
           ) : (
             <div style={{ margin: '8px 0 12px' }}>
-              <p style={{ margin: '0 0 8px', fontSize: 13, color: '#9badab' }}>Own this spot for {PLOT_PRICE} sparks. Earn 2 sparks every time another player checks in here.</p>
+              <p style={{ margin: '0 0 8px', fontSize: 13, color: '#9badab' }}>Own this spot for {PLOT_PRICE} sparks. Earn 2 play sparks every time another player checks in here, or 6 during Rush Hour.</p>
               <input value={plotName} onChange={(e) => setPlotName(e.target.value)} maxLength={40} placeholder="Name your plot (optional)"
                 style={{ width: '100%', padding: '9px 11px', borderRadius: 10, background: '#0b1215', border: '1px solid #34444a', color: '#e8f3ea', fontSize: 13 }} />
             </div>
@@ -259,7 +286,12 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {standingHere && (
               <button className="primary-button" onClick={doCheckIn} disabled={busy}>
-                {busy ? <Loader2 className="spin" size={15} /> : <Footprints size={15} />} Check in · +{selPlot && selPlot.owner_id !== userId ? 8 : 5}
+                {busy ? <Loader2 className="spin" size={15} /> : <Footprints size={15} />} Check in · +{(selPlot && selPlot.owner_id !== userId ? 8 : 5) + (selPlot && selPlot.owner_id !== userId && isBoosted(selPlot) ? 5 : 0) + (dropsRef.current.get(selKey!)?.bonus ?? 0)}
+              </button>
+            )}
+            {selPlot && selPlot.owner_id === userId && (
+              <button className="primary-button" onClick={doBoost} disabled={busy || sparkBalance < BOOST_PRICE} style={{ background: sparkBalance < BOOST_PRICE ? '#3a4a44' : '#ffd23f', color: '#132019' }}>
+                {busy ? <Loader2 className="spin" size={15} /> : <Sparkles size={15} />} {isBoosted(selPlot) ? 'Extend' : 'Rush Hour'} · 3h · {BOOST_PRICE} sparks
               </button>
             )}
             {!selPlot && (
