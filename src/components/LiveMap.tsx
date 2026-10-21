@@ -278,7 +278,7 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
             <p style={{ margin: '8px 0 12px', fontSize: 14 }}><strong>{selPlot.name ?? 'Plot'}</strong> · owned by {selPlot.owner_id === userId ? 'you' : (selPlot.owner_name ?? 'a player')} · {selPlot.visits} visits{selPlot.owner_id === userId ? ` · ${selPlot.earned} sparks earned` : ''}</p>
           ) : (
             <div style={{ margin: '8px 0 12px' }}>
-              <p style={{ margin: '0 0 8px', fontSize: 13, color: '#9badab' }}>Own this spot for {PLOT_PRICE} sparks. Earn 2 play sparks every time another player checks in here, or 6 during Rush Hour.</p>
+              <p style={{ margin: '0 0 8px', fontSize: 13, color: '#9badab' }}>Own this spot for {PLOT_PRICE} sparks. Collect 2 sparks rent every time another player checks in here, or 6 during Rush Hour. Members can cash out rent within their plan's monthly limit.</p>
               <input value={plotName} onChange={(e) => setPlotName(e.target.value)} maxLength={40} placeholder="Name your plot (optional)"
                 style={{ width: '100%', padding: '9px 11px', borderRadius: 10, background: '#0b1215', border: '1px solid #34444a', color: '#e8f3ea', fontSize: 13 }} />
             </div>
