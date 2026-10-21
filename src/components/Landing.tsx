@@ -221,7 +221,7 @@ function Landing({ onStart, onSignIn }: LandingProps) {
             <article className="lp-step cash">
               <div className="lp-step-head"><span className="quest-icon"><Banknote size={20} /></span><span className="lp-step-num">04</span></div>
               <h3>Cash out</h3>
-              <p>Subscribers turn sparks into real payouts. 100-spark minimum.</p>
+              <p>Members turn eligible sparks into real payouts. 100-spark minimum.</p>
             </article>
           </div>
           <div className="lp-band">
@@ -233,14 +233,21 @@ function Landing({ onStart, onSignIn }: LandingProps) {
         <section className="lp-section lp-split">
           <div className="lp-card">
             <span className="quest-icon blue"><Store size={20} /></span>
-            <h3>For local businesses</h3>
-            <p>Drops bring real customers to your counter. Place a drop at your cafe, shop, or restaurant and players walk in to collect it.</p>
-            <a className="primary-button" href={PARTNER_MAIL}><Mail size={15} /> Become a partner</a>
+            <p className="eyebrow" style={{ marginTop: 12 }}>FOR LOCAL BUSINESSES</p>
+            <h3>Turn players into customers</h3>
+            <p>Put a sponsored drop at your cafe, shop, or restaurant. It glows on the live map, and players walk in to check in and collect bonus sparks.</p>
+            <ul style={{ margin: '12px 0 16px', paddingLeft: 18, display: 'grid', gap: 6, fontSize: 14, color: '#b9c9c4' }}>
+              <li><b>Real foot traffic:</b> players only earn when they're physically at your door.</li>
+              <li><b>Stand out:</b> your business name shows on a highlighted spot on the map.</li>
+              <li><b>You set the reward:</b> pick the bonus and how long it runs.</li>
+              <li><b>Simple monthly plan:</b> from $50 a month, cancel anytime.</li>
+            </ul>
+            <a className="primary-button" href={PARTNER_MAIL}><Mail size={15} /> Feature my business</a>
           </div>
           <div className="lp-card soon">
-            <span className="lp-soon-pill"><Clock size={11} /> COMING SOON</span>
+            <span className="lp-soon-pill"><Sparkles size={11} /> LIVE NOW</span>
             <h3 className="lp-icon-title"><MapIcon size={22} /> Own the Block</h3>
-            <p>Buy virtual land on a real city map and collect rent when players walk through it.</p>
+            <p>Buy plots on a real city map and earn sparks every time players check in. Turn on Rush Hour to make your plot glow and draw a crowd.</p>
             <div className="lp-mission">
               <HandHeart size={18} />
               <p>Faithfeast restaurants earn bonus drops. Faithfeast, sponsored by Givenga, is ending food scarcity one neighborhood at a time, from a smartphone near you.</p>
