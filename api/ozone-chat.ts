@@ -215,7 +215,7 @@ export default async function handler(req: Req, res: Res) {
     if (out.reply) return res.status(200).json({ reply: out.reply, persona });
     console.error('ozone-chat gemini failure', out.status, out.error);
     const code = out.status === 429 ? 429 : 502;
-    return res.status(code).json({ error: code === 429 ? 'Ozone is super popular right now. Try again in a minute.' : 'Ozone lost signal. Try again.' });
+    return res.status(code).json({ error: code === 429 ? 'Ozone is super popular right now. Try again in a minute.' : 'Ozone lost signal. Try again.', code: out.status, detail: String(out.error || '').replace(/AIza[\w-]+/g, '[key]').slice(0, 200) });
   } catch (e) {
     console.error('ozone-chat error', e);
     return res.status(502).json({ error: 'Ozone lost signal. Try again.' });
