@@ -35,6 +35,29 @@ export function getOrCreatePlayerId(userId?: string): string {
   return id;
 }
 
+/**
+ * Returns the player id of the wallet this account already owns (the one with the most
+ * lifetime sparks), so balances follow the account across devices, browsers, and domains.
+ * Only creates a new local id when the account has no wallet yet.
+ */
+export async function resolvePlayerId(userId: string): Promise<string> {
+  const storageKey = `${PLAYER_ID_KEY}_${userId}`;
+  const { data, error } = await supabase
+    .from('wallet')
+    .select('player_id, lifetime_sparks, sparks')
+    .eq('user_id', userId)
+    .order('lifetime_sparks', { ascending: false })
+    .order('sparks', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const owned = data?.[0]?.player_id as string | undefined;
+  if (owned) {
+    localStorage.setItem(storageKey, owned);
+    return owned;
+  }
+  return getOrCreatePlayerId(userId);
+}
+
 export async function fetchProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from('products')

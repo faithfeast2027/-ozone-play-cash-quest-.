@@ -42,6 +42,7 @@ import {
   fetchProducts,
   fetchSubscription,
   fetchWallet,
+  resolvePlayerId,
   fetchWithdrawals,
   getOrCreatePlayerId,
   requestWithdrawal,
@@ -241,7 +242,18 @@ function App() {
   };
   const nextLevelReward = progress.unclaimedLevelRewards[0];
 
-  const playerId = useMemo(() => getOrCreatePlayerId(session?.user.id), [session?.user.id]);
+  // The player id must follow the ACCOUNT, not the browser/domain. Look up the wallet this
+  // account already owns before using a local id, so switching devices or domains never
+  // shows an empty wallet.
+  const [playerId, setPlayerId] = useState('');
+  useEffect(() => {
+    const uid = session?.user.id;
+    if (!uid) { setPlayerId(getOrCreatePlayerId()); return; }
+    let on = true;
+    setPlayerId('');
+    resolvePlayerId(uid).then((id) => { if (on) setPlayerId(id); }).catch(() => { if (on) setPlayerId(getOrCreatePlayerId(uid)); });
+    return () => { on = false; };
+  }, [session?.user.id]);
   const username = getUsername(session?.user);
   const readKey = `${READ_NOTIFICATIONS_KEY}_${session?.user.id ?? 'guest'}`;
   const unreadCount = NOTIFICATIONS.filter((n) => !readNotifications.includes(n.id)).length;
@@ -339,7 +351,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || !playerId) return;
     let active = true;
     (async () => {
       try {
@@ -361,27 +373,28 @@ function App() {
   }, [session?.user.id]);
 
   useEffect(() => {
-    if (!session?.user.id) return;
+    if (!session?.user.id || !playerId) return;
     supabase.rpc('claim_daily_bonus', { p_player_id: playerId }).then(({ data }) => {
       const r = data as { claimed?: boolean; amount?: number; streak?: number } | null;
       if (r?.claimed) { setDailyBonus({ amount: r.amount ?? 0, streak: r.streak ?? 1 }); fetchWallet(playerId).then((w) => { if (w) setWallet(w); }); setTimeout(() => setDailyBonus(null), 6000); }
       loadStreak();
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user.id]);
+  }, [session?.user.id, playerId]);
 
   useEffect(() => {
     const uid = session?.user.id;
     const ref = localStorage.getItem(REF_KEY);
-    if (!uid || !ref) return;
+    if (!uid || !ref || !playerId) return;
     localStorage.removeItem(REF_KEY);
     if (ref === uid) return;
     supabase.rpc('accept_referral', { p_ref: ref, p_player_id: playerId }).then(() => { fetchWallet(playerId).then((w) => { if (w) setWallet(w); }); });
     if (window.location.search.includes('ref=')) window.history.replaceState({}, '', window.location.pathname);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user.id]);
+  }, [session?.user.id, playerId]);
 
   useEffect(() => {
+    if (!playerId) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
       setCheckoutSuccess(true);
@@ -398,7 +411,8 @@ function App() {
       };
       poll();
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerId]);
 
   const handleBuy = async (product: Product) => {
     setCheckoutError(null);
