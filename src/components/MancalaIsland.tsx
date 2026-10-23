@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { X, Sparkles, Trophy, RotateCcw, Waves, Shell, Crown } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { X, Sparkles, Trophy, RotateCcw, Waves, Shell, Crown, Zap } from 'lucide-react';
+import { reportGameResult } from '@/lib/progress';
+import { sfx, haptic } from '@/lib/sfx';
+import { Confetti } from '@/components/Celebrations';
+import { SfxToggle } from '@/components/GameShell';
 import { creditSparks, fetchWallet, getOrCreatePlayerId } from '@/lib/supabase';
 import type { Character } from '@/components/SparkRunGame';
 
@@ -143,6 +147,9 @@ export default function MancalaIsland({ character, onClose, onWalletUpdate }: Pr
   const [history, setHistory] = useState<{ you: number; ai: number }[]>([]);
   const [credited, setCredited] = useState(false);
   const [lastPit, setLastPit] = useState<number | null>(null);
+  const [xpGained, setXpGained] = useState<number | null>(null);
+  const [capture, setCapture] = useState(0);
+  const reportedRef = useRef(false);
 
   const playerId = useMemo(() => getOrCreatePlayerId(), []);
   const [playerScore, aiScore] = board.stores;
@@ -151,6 +158,13 @@ export default function MancalaIsland({ character, onClose, onWalletUpdate }: Pr
 
   const endGame = useCallback((finalBoard: Board) => {
     setPhase('ended');
+    if (!reportedRef.current) {
+      reportedRef.current = true;
+      const won = finalBoard.stores[PLAYER] > finalBoard.stores[AI];
+      const rep = reportGameResult('mancala', finalBoard.stores[PLAYER], won);
+      setXpGained(rep.xpGained);
+      if (won) { sfx.win(); haptic([20, 50, 20, 50, 40]); } else sfx.over();
+    }
     if (finalBoard.stores[PLAYER] > finalBoard.stores[AI]) {
       setWinner(PLAYER);
       setMessage('You won the island round!');
@@ -195,6 +209,7 @@ export default function MancalaIsland({ character, onClose, onWalletUpdate }: Pr
       const timer = setTimeout(() => {
         const pit = aiMove(board);
         const { board: next } = sowStones(board, pit, AI);
+        sfx.tick();
         setLastPit(pit);
         setBoard(next);
         setThinking(false);
@@ -209,6 +224,8 @@ export default function MancalaIsland({ character, onClose, onWalletUpdate }: Pr
     if (phase === 'ended' || turn !== PLAYER || thinking) return;
     if (!isValidMove(board, pit, PLAYER)) return;
     const { board: next, extraTurn, captured } = sowStones(board, pit, PLAYER);
+    sfx.tap(); haptic(8);
+    if (captured) { setCapture((c) => c + 1); sfx.pop(true); haptic([10, 30, 10]); }
     setLastPit(pit);
     setBoard(next);
     if (captured) {
@@ -230,6 +247,8 @@ export default function MancalaIsland({ character, onClose, onWalletUpdate }: Pr
     setThinking(false);
     setCredited(false);
     setLastPit(null);
+    setXpGained(null);
+    reportedRef.current = false;
   };
 
   const earnedSparks = winner === PLAYER ? SPARKS_PER_WIN + board.stores[PLAYER] * SPARKS_PER_SHELL : winner === -1 ? Math.floor(board.stores[PLAYER] * SPARKS_PER_SHELL * 0.5) : 0;
@@ -237,6 +256,9 @@ export default function MancalaIsland({ character, onClose, onWalletUpdate }: Pr
   return (
     <div className="modal-backdrop">
       <div className="game-modal mancala-modal">
+        {phase === 'ended' && winner === PLAYER && <Confetti />}
+        {capture > 0 && <span key={capture} className="mancala-capture">Capture!</span>}
+        <div style={{ position: 'absolute', right: 52, top: 12 }}><SfxToggle /></div>
         <button className="modal-close" onClick={onClose}><X size={17} /></button>
         <div className="game-header">
           <div>
@@ -321,6 +343,7 @@ export default function MancalaIsland({ character, onClose, onWalletUpdate }: Pr
               <span className={winner === PLAYER ? 'win' : ''}><b>You</b> {board.stores[PLAYER]}</span>
               <span className={winner === AI ? 'win' : ''}><b>AI</b> {board.stores[AI]}</span>
             </div>
+            {xpGained !== null && <span className="mancala-xp"><Zap size={13} /> +{xpGained} XP</span>}
             {earnedSparks > 0 && <p className="earned-note"><Sparkles size={13} /> Earned {earnedSparks} sparks · added to your wallet</p>}
             <div className="run-gameover-actions">
               <button className="primary-button" onClick={restart}><RotateCcw size={15} /> Play again</button>
