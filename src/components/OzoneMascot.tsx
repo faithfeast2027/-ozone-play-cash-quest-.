@@ -5,13 +5,17 @@ import { sfx, haptic } from '@/lib/sfx';
 import { useMascotSettings, setMascotMinimized, setMascotPos, onMascotMessage, pickLine, TIP_LINES, TAP_LINES, type MascotMood } from '@/lib/mascot';
 
 type Props = {
+  level?: number;
   username?: string;
   questsLeft: number; // daily quests not yet completed
   readyToClaim: number; // quests done but unclaimed
   suppressed?: boolean; // a game / modal / menu is open
 };
 
-const SIZE = 78;
+const BASE_SIZE = 78;
+let SIZE = BASE_SIZE;
+/** Ozone grows as the player levels up: +4px per level, capped at 1.7x (level 15+). */
+export function mascotSizeForLevel(level: number) { return Math.round(Math.min(BASE_SIZE * 1.7, BASE_SIZE + Math.max(0, level - 1) * 4)); }
 const MARGIN = 10;
 const NAV_CLEAR = 92; // keeps Ozone above the floating bottom nav by default
 
@@ -43,7 +47,8 @@ function nudgeClear(x: number, y: number) {
   return { x, y };
 }
 
-export default function OzoneMascot({ username, questsLeft, readyToClaim, suppressed }: Props) {
+export default function OzoneMascot({ username, questsLeft, readyToClaim, suppressed, level = 1 }: Props) {
+  SIZE = mascotSizeForLevel(level);
   const { visible, minimized, pos } = useMascotSettings();
   const reduced = useRef(prefersReducedMotion()).current;
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -201,7 +206,7 @@ export default function OzoneMascot({ username, questsLeft, readyToClaim, suppre
     <div
       ref={rootRef}
       className={`oz-root ${dragging ? 'dragging' : ''} ${reduced ? 'reduced' : ''}`}
-      style={{ transform: `translate3d(${xy.x}px, ${xy.y}px, 0)` }}
+      style={{ transform: `translate3d(${xy.x}px, ${xy.y}px, 0)`, width: SIZE, height: SIZE, transition: 'transform .45s var(--spring, ease), width .6s var(--spring, ease), height .6s var(--spring, ease)' }}
     >
       {bubble && (
         <div key={bubble.key} className={`oz-bubble ${onLeft ? 'left' : 'right'} ${xy.y < 190 ? 'below' : ''}`} role="status" aria-live="polite">{bubble.text}</div>
