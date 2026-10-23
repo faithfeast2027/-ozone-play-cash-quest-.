@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/push-cron?job=morning", "schedule": "0 14 * * *" },
+    { "path": "/api/push-cron?job=streak", "schedule": "0 23 * * *" }
+  ]
+}

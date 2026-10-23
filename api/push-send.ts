@@ -74,7 +74,7 @@ async function sendOne(sub: PushSub, data: object): Promise<number> {
 }
 
 // ---------------- Supabase (service role REST) ----------------
-async function sb(path: string, init: RequestInit = {}) {
+export async function sb(path: string, init: RequestInit = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...init,
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(init.headers as Record<string, string> | undefined) },
@@ -90,7 +90,7 @@ async function getUser(token: string): Promise<{ id: string; email?: string } | 
   } catch { return null; }
 }
 
-async function deliver(subs: PushSub[], data: object) {
+export async function deliver(subs: PushSub[], data: object) {
   let sent = 0, failed = 0, removed = 0;
   const gone: string[] = [];
   const queue = [...subs];
