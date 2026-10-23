@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { sfx, haptic, unlockAudio } from '@/lib/sfx';
 import {
   X,
   Footprints,
@@ -62,30 +63,8 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
   // Coin "ching ching" every 444 steps.
   const COIN_EVERY_STEPS = 444;
   const lastCoinMilestoneRef = useRef(0);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const playChing = () => {
-    try {
-      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AC) return;
-      const ctx = audioCtxRef.current ?? new AC();
-      audioCtxRef.current = ctx;
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-      const ding = (start: number) => {
-        [1568, 2093, 3136].forEach((freq, i) => {
-          const o = ctx.createOscillator(); const g = ctx.createGain();
-          o.type = i === 0 ? 'square' : 'sine';
-          o.frequency.setValueAtTime(freq, start);
-          g.gain.setValueAtTime(0.0001, start);
-          g.gain.exponentialRampToValueAtTime(i === 0 ? 0.08 : 0.15, start + 0.01);
-          g.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
-          o.connect(g).connect(ctx.destination); o.start(start); o.stop(start + 0.4);
-        });
-      };
-      const t = ctx.currentTime;
-      ding(t); ding(t + 0.16);
-      if ('vibrate' in navigator) navigator.vibrate?.([30, 60, 30]);
-    } catch { /* ignore */ }
-  };
+  // Ching routes through the player's selected sound pack + volume (src/lib/sfx.ts).
+  const playChing = () => { sfx.ching(); haptic([30, 60, 30]); };
   const [coinPop, setCoinPop] = useState(false);
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
   const wantAwakeRef = useRef(false);
@@ -161,7 +140,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
     }
     setGpsStatus('searching');
     acquireWakeLock();
-    try { const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext; if (AC && !audioCtxRef.current) audioCtxRef.current = new AC(); audioCtxRef.current?.resume().catch(() => {}); } catch { /* ignore */ }
+    unlockAudio();
     if (!session) {
       try {
         const newSession = await startWalkSession();

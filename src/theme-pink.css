@@ -1,0 +1,136 @@
+/* ==========================================================================
+   Pink theme — deep berry base, hot-pink / rose accents, soft blush gradients
+   and pink glows. Loaded after index.css + arcade.css; scoped to .theme-pink.
+   ========================================================================== */
+.theme-pink {
+  --pk-bg: #1d0816; --pk-surface: #2b0f22; --pk-surface2: #351329; --pk-line: #5e2449; --pk-line2: #7a2f5e;
+  --pk-hot: #ff4f9a; --pk-rose: #ff8fbd; --pk-blush: #ffc2db; --pk-text: #fff0f7; --pk-muted: #e3b0c8;
+  --lime: #ff8fbd; --aqua: #ffc2db; --glass: rgba(52, 16, 40, .55); --glass-strong: rgba(40, 12, 31, .8); --glass-line: rgba(255, 170, 210, .14); --glass-hi: rgba(255, 210, 230, .18);
+  --oz-orb: #ff7ab8; --oz-orb-deep: #b0175f; --oz-accent: #ff6fae; --oz-trim-a: #ff4f9a; --oz-trim-b: #ffc2db; --oz-blush: #ff7aa8;
+  --oz-bubble-bg: rgba(48, 13, 36, .94); --oz-bubble-fg: #fff0f7; --oz-bubble-line: rgba(255, 143, 189, .5);
+  color: var(--pk-text); background: var(--pk-bg);
+}
+.theme-pink.app-shell, .theme-pink .app-shell, .theme-pink.auth-shell {
+  background:
+    radial-gradient(60rem 40rem at 85% -10%, rgba(255, 79, 154, .30), transparent 60%),
+    radial-gradient(50rem 36rem at -10% 40%, rgba(255, 194, 219, .14), transparent 60%),
+    radial-gradient(40rem 30rem at 50% 110%, rgba(255, 143, 189, .14), transparent 60%), var(--pk-bg);
+}
+.theme-pink .ambient { background: #ff4f9a; }
+
+/* header */
+.theme-pink .brand-mark { border-color: var(--pk-rose); color: var(--pk-rose); box-shadow: 0 0 18px -4px rgba(255, 79, 154, .6); }
+.theme-pink .brand-name, .theme-pink .profile-name, .theme-pink .welcome-row h1, .theme-pink .section-heading h2, .theme-pink .side-section h2 { color: var(--pk-text); }
+.theme-pink .brand-name span, .theme-pink .eyebrow, .theme-pink .text-button, .theme-pink .online-label i, .theme-pink .quest-meta b { color: var(--pk-rose); }
+.theme-pink .brand-subtitle, .theme-pink .intro, .theme-pink .quest-body p, .theme-pink .daily-copy small, .theme-pink .activity-card p, .theme-pink .trust-card p, .theme-pink .online-label, .theme-pink .card-arrow, .theme-pink .quest-tag, .theme-pink .daily-reward { color: var(--pk-muted); }
+.theme-pink .icon-button, .theme-pink .theme-toggle, .theme-pink .sfx-toggle, .theme-pink .level-chip, .theme-pink .profile-chip { background: var(--pk-surface); border-color: var(--pk-line); color: #f6d3e4; }
+.theme-pink .theme-toggle-icon { background: #5a1d43; color: var(--pk-blush); }
+.theme-pink .avatar { background: var(--pk-rose); color: #2a0618; }
+.theme-pink .level-ring b { color: #fff; text-shadow: 0 0 10px rgba(255, 79, 154, .8); }
+.theme-pink .level-ring stop:first-child, .theme-pink #xpgrad stop:first-child { stop-color: #ff4f9a; }
+.theme-pink .level-ring stop:last-child, .theme-pink #xpgrad stop:last-child { stop-color: #ffc2db; }
+.theme-pink .profile-menu { background: var(--pk-surface); border-color: var(--pk-line); color: var(--pk-text); }
+.theme-pink .profile-menu span { color: var(--pk-muted); }
+.theme-pink .profile-menu input { background: #1d0816 !important; border-color: var(--pk-line) !important; color: var(--pk-text) !important; }
+
+/* hub */
+.theme-pink .welcome-row h1 em { background: linear-gradient(90deg, #ff4f9a, #ffc2db); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.theme-pink .streak-badge { background: rgba(255, 79, 154, .1); border-color: rgba(255, 143, 189, .35); }
+.theme-pink .streak-flame { color: var(--pk-hot); text-shadow: 0 0 12px var(--pk-hot); }
+.theme-pink .hero-card { background: linear-gradient(115deg, #7a1650, #4a0f35 55%, #8e2a63); border-color: #b04a86; box-shadow: 0 30px 80px -30px rgba(0,0,0,.9), 0 0 60px -20px rgba(255, 79, 154, .55), 0 1px 0 rgba(255,255,255,.14) inset; }
+.theme-pink .hero-card h2, .theme-pink .hero-card p { color: #fff3f8; }
+.theme-pink .live-pill { color: var(--pk-blush); border-color: rgba(255, 194, 219, .4); }
+.theme-pink .live-pill span { background: var(--pk-hot); box-shadow: 0 0 10px var(--pk-hot); }
+.theme-pink .quest-card, .theme-pink .daily-item, .theme-pink .spark-card, .theme-pink .activity-card, .theme-pink .trust-card, .theme-pink .character-card, .theme-pink .large-quest, .theme-pink .store-card, .theme-pink .xp-strip {
+  background: linear-gradient(160deg, rgba(255, 194, 219, .09), rgba(255, 143, 189, .02)), var(--glass);
+  border-color: var(--glass-line); color: var(--pk-text);
+}
+.theme-pink .quest-card:hover, .theme-pink .large-quest:hover, .theme-pink .character-card:hover, .theme-pink .daily-item:hover { border-color: rgba(255, 143, 189, .55); box-shadow: 0 1px 0 var(--glass-hi) inset, 0 24px 50px -20px rgba(0,0,0,.8), 0 0 40px -10px rgba(255, 79, 154, .45); }
+.theme-pink .large-quest strong, .theme-pink .daily-copy strong, .theme-pink .trust-card strong { color: #ffe6f1; }
+.theme-pink .large-quest small, .theme-pink .daily-item .daily-copy em { color: var(--pk-muted); }
+.theme-pink .primary-button, .theme-pink .hero-card .primary-button { background: linear-gradient(135deg, #ff4f9a, #ff9cc6); color: #2a0618; box-shadow: 0 10px 30px -10px rgba(255, 79, 154, .8); }
+.theme-pink .xp-bar i, .theme-pink .daily-item .daily-progress i { background: linear-gradient(90deg, #ff4f9a, #ffc2db) !important; box-shadow: 0 0 14px rgba(255, 79, 154, .7); }
+.theme-pink .xp-strip button, .theme-pink .claim-pill { background: linear-gradient(135deg, #ff4f9a, #ff9cc6); color: #2a0618; box-shadow: 0 6px 18px -6px rgba(255, 79, 154, .9); }
+.theme-pink .quest-count { background: rgba(255, 79, 154, .16); color: var(--pk-rose); }
+.theme-pink .daily-icon { background: rgba(255, 143, 189, .14); color: var(--pk-rose); }
+.theme-pink .chest-row { border-color: rgba(255, 194, 219, .4); background: rgba(255, 143, 189, .07); color: var(--pk-blush); }
+.theme-pink .balance-card { background: linear-gradient(135deg, #ff8fbd, #ffc2db 60%, #ffe3ef); color: #3a0a24; box-shadow: 0 20px 50px -20px rgba(255, 79, 154, .7); }
+.theme-pink .balance-card button { color: #3a0a24; }
+.theme-pink .spark-icon { color: var(--pk-blush); background: rgba(255, 143, 189, .14); }
+.theme-pink .spark-card button { background: var(--pk-rose); color: #2a0618; }
+.theme-pink .active-badge { background: var(--pk-rose); color: #2a0618; }
+.theme-pink .character-card.active { border-color: var(--pk-rose); box-shadow: 0 0 30px -8px rgba(255, 79, 154, .6); }
+.theme-pink .bottom-nav { background: rgba(43, 15, 34, .8) !important; border-color: var(--pk-line) !important; }
+.theme-pink .bottom-nav button { color: #e0a9c3; }
+.theme-pink .bottom-nav button.active { background: linear-gradient(135deg, #ff4f9a, #ff9cc6); color: #2a0618; box-shadow: 0 6px 20px -6px rgba(255, 79, 154, .9); }
+.theme-pink .quest-card::before { --card-accent: rgba(255, 79, 154, .4); }
+
+/* map + panels + modals */
+.theme-pink .map-drawer, .theme-pink .overlay-panel, .theme-pink .drop-modal, .theme-pink .game-modal, .theme-pink .store-modal, .theme-pink .settings-modal { background: rgba(43, 15, 34, .94); border-color: var(--pk-line2); color: var(--pk-text); box-shadow: 0 40px 100px -30px #000, 0 0 60px -30px rgba(255, 79, 154, .6); }
+.theme-pink .drawer-header h2, .theme-pink .overlay-panel h2, .theme-pink .drop-modal h2, .theme-pink .game-modal h2, .theme-pink .store-modal h2 { color: #fff3f8; }
+.theme-pink .location-pill, .theme-pink .panel-subtitle, .theme-pink .drop-modal p:not(.eyebrow), .theme-pink .game-instruction, .theme-pink .game-score, .theme-pink .game-footnote, .theme-pink .store-subtitle, .theme-pink .store-trust, .theme-pink .store-card-body small, .theme-pink .map-subtitle, .theme-pink .map-legend { color: var(--pk-muted); }
+.theme-pink .map-grid { background-color: #2f0f25; background-image: linear-gradient(#ff8fbd1f 1px, transparent 1px), linear-gradient(90deg, #ff8fbd1f 1px, transparent 1px); }
+.theme-pink .map-road { background: #ff8fbd45; }
+.theme-pink .point-core { background: var(--pk-rose); box-shadow: 0 0 19px rgba(255, 143, 189, .7); }
+.theme-pink .point-pulse { border-color: rgba(255, 143, 189, .5); }
+.theme-pink .close-panel, .theme-pink .modal-close { background: #4f1a3d; color: var(--pk-blush); }
+.theme-pink .store-card-top, .theme-pink .store-trust svg, .theme-pink .wallet-sparks, .theme-pink .wallet-sparks svg, .theme-pink .store-price { color: var(--pk-rose); }
+.theme-pink .wallet-sparks { background: rgba(255, 143, 189, .12); }
+.theme-pink .store-card:hover:not(:disabled) { border-color: var(--pk-rose); }
+.theme-pink .checkout-error { background: #ff4f9a1a; border-color: #ff4f9a55; color: #ffc2db; }
+.theme-pink .checkout-toast { background: linear-gradient(135deg, #ff4f9a, #ff9cc6); color: #2a0618; }
+.theme-pink .checkout-toast svg { color: #2a0618; }
+.theme-pink .modal-backdrop { background: rgba(26, 4, 18, .62); }
+.theme-pink .drop-reward { color: var(--pk-rose); }
+.theme-pink .wallet-total strong { color: #fff3f8; }
+.theme-pink .wallet-actions button { border-color: var(--pk-line); }
+.theme-pink .withdraw-section, .theme-pink .withdraw-history { background: var(--pk-surface); border-color: var(--pk-line); }
+.theme-pink .withdraw-input-row input, .theme-pink .withdraw-input-row select { background: #1d0816 !important; border-color: var(--pk-line) !important; color: var(--pk-text) !important; }
+.theme-pink .withdraw-status.active { background: #ff8fbd18; color: var(--pk-rose); border-color: #ff8fbd44; }
+.theme-pink .withdraw-gate-note, .theme-pink .withdraw-footnote { color: var(--pk-muted); }
+.theme-pink .wallet-note { border-color: var(--pk-line); }
+.theme-pink .settings-group, .theme-pink .pack-row, .theme-pink .theme-swatch, .theme-pink .track-chip { background: rgba(255, 194, 219, .05); border-color: var(--pk-line); }
+.theme-pink .settings-group > small, .theme-pink .pack-row .pack-copy small { color: var(--pk-muted); }
+
+/* games: arcade shell, start + game-over cards */
+.theme-pink .arcade-shell { --accent: #ff5fa2; --accent2: #ffc2db; background: linear-gradient(180deg, rgba(60, 14, 44, .96), rgba(29, 8, 22, .98)); border-color: var(--pk-line2); color: var(--pk-text); }
+.theme-pink .arcade-shell-glow { opacity: .28; }
+.theme-pink .arcade-stage { box-shadow: 0 0 0 1px rgba(255, 143, 189, .2) inset, 0 20px 50px -20px #000, 0 0 40px -18px rgba(255, 79, 154, .6); }
+.theme-pink .arcade-ready { background: radial-gradient(circle at 50% 45%, rgba(60, 10, 40, .15), rgba(30, 4, 20, .6)); }
+.theme-pink .arcade-over { background: rgba(30, 4, 20, .6); }
+.theme-pink .arcade-ready-card, .theme-pink .arcade-over-card { background: linear-gradient(170deg, rgba(255, 194, 219, .16), rgba(255, 143, 189, .04)), rgba(48, 13, 36, .82); border-color: rgba(255, 170, 210, .25); box-shadow: 0 30px 80px -20px #000, 0 0 50px -16px rgba(255, 79, 154, .6), 0 1px 0 rgba(255,255,255,.18) inset; }
+.theme-pink .arcade-ready-card p, .theme-pink .arcade-over-sub { color: #f1c4d8; }
+.theme-pink .arcade-cta { color: #2a0618; }
+.theme-pink .arcade-bigscore { background: linear-gradient(180deg, #fff, #ffc2db); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.theme-pink .arcade-over-stats span, .theme-pink .hud-chip, .theme-pink .arcade-ghost, .theme-pink .arcade-close { background: rgba(255, 194, 219, .08); border-color: var(--glass-line); color: var(--pk-text); }
+.theme-pink .arcade-over-stats small, .theme-pink .arcade-over-note, .theme-pink .arcade-foot { color: #d79ab8; }
+.theme-pink .arcade-over-level { color: var(--pk-rose); }
+.theme-pink .arcade-pad { color: var(--pk-text); }
+.theme-pink .arcade-pad.primary, .theme-pink .arcade-mode, .theme-pink .arcade-icon, .theme-pink .arcade-ready-icon { color: #2a0618; }
+.theme-pink .mancala-modal, .theme-pink .drunk-modal { background: linear-gradient(170deg, rgba(255, 194, 219, .1), rgba(255, 143, 189, .02)), rgba(43, 15, 34, .94) !important; border-color: var(--pk-line2) !important; }
+.theme-pink .island-board { background: linear-gradient(180deg, #3a1230 0%, #4f1a40 50%, #3a1230 100%); border-color: var(--pk-line2); }
+.theme-pink .shell-pit { background: radial-gradient(circle, #4f1a40 0 60%, #3a1230 61% 100%); border-color: var(--pk-line); }
+.theme-pink .island-store { background: #3a1230; border-color: #ff8fbd44; }
+.theme-pink .island-store strong, .theme-pink .result-banner, .theme-pink .result-score .win, .theme-pink .result-score .win b { color: var(--pk-rose); }
+.theme-pink .status-pill.you { background: #ff8fbd18; color: var(--pk-rose); border-color: #ff8fbd44; }
+.theme-pink .mancala-result { background: #ff8fbd10; border-color: #ff8fbd44; }
+.theme-pink .mancala-xp { background: rgba(255, 143, 189, .14); color: var(--pk-rose); }
+.theme-pink .drunk-table { background: linear-gradient(180deg, #3d1232, #2a0c22); border-color: var(--pk-line2); }
+.theme-pink .player-row, .theme-pink .discard-preview { background: rgba(255, 194, 219, .05); border-color: var(--pk-line); }
+.theme-pink .nyc-arena { background: linear-gradient(180deg, #2a0820 0%, #4a1238 50%, #2a0c22 100%); border-color: var(--pk-line2); }
+.theme-pink .temple-arena { background: linear-gradient(180deg, #2a0820 0%, #4a1238 50%, #2a0c22 100%); border-color: var(--pk-line2); }
+.theme-pink .floppy-sky { background: linear-gradient(180deg, #3a0f2e, #6a1f4f 50%, #a8457c 100%); }
+.theme-pink .walk-stat, .theme-pink .gps-status, .theme-pink .walk-history { background: var(--pk-surface); border-color: var(--pk-line); }
+.theme-pink .gate-card, .theme-pink .walk-stat.accent { background: #ff8fbd10; border-color: #ff8fbd44; }
+.theme-pink .walk-stat.accent strong, .theme-pink .walk-stat.accent svg, .theme-pink .history-sparks, .theme-pink .portal-link:hover { color: var(--pk-rose); }
+
+/* celebrations */
+.theme-pink .celebrate-backdrop { background: radial-gradient(circle at 50% 40%, rgba(255, 79, 154, .26), rgba(26, 4, 18, .86) 60%); }
+.theme-pink .celebrate-card { background: linear-gradient(170deg, rgba(255, 194, 219, .14), rgba(255, 143, 189, .03)), rgba(48, 13, 36, .88); border-color: rgba(255, 170, 210, .25); color: var(--pk-text); }
+.theme-pink .celebrate-eyebrow { color: var(--pk-rose); }
+.theme-pink .level-medal { background: radial-gradient(circle at 35% 30%, #fff 0 6%, #ffe3ef 12%, #ff8fbd 40%, #b0175f 100%); box-shadow: 0 0 0 8px rgba(255, 143, 189, .18), 0 0 60px rgba(255, 79, 154, .7), 0 20px 40px -10px #000; }
+.theme-pink .level-medal span { color: #3a0a24; }
+
+/* auth screen */
+.theme-pink .auth-card { background: rgba(43, 15, 34, .94); border-color: var(--pk-line2); color: var(--pk-text); }
+.theme-pink .auth-card input { background: #1d0816; border-color: var(--pk-line); color: var(--pk-text); }

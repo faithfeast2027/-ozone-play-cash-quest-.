@@ -35,6 +35,8 @@ import {
   Star,
   Coins,
   Bird,
+  Heart,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import {
   creditSparks,
@@ -71,9 +73,14 @@ import { useProgress, setProgressUser, claimQuest, claimChest, claimLevelReward,
 import { LevelUpOverlay, ChestOverlay, LevelRing } from '@/components/Celebrations';
 import { SfxToggle } from '@/components/GameShell';
 import { sfx, haptic } from '@/lib/sfx';
+import OzoneMascot from '@/components/OzoneMascot';
+import SettingsSheet, { type Theme } from '@/components/SettingsSheet';
+import { mascotCheer } from '@/lib/mascot';
 
 type Tab = 'explore' | 'quests' | 'wallet';
-type Theme = 'dark' | 'white' | 'red';
+const THEME_KEY = 'ozone_theme';
+const THEME_ORDER: Theme[] = ['dark', 'white', 'red', 'pink'];
+function loadTheme(): Theme { try { const t = localStorage.getItem(THEME_KEY) as Theme | null; return t && THEME_ORDER.includes(t) ? t : 'dark'; } catch { return 'dark'; } }
 
 const CHARACTERS: Character[] = [
   { id: 'mascot', name: 'Ozone', image: '/assets/Gemini_Generated_Image__(1).jpg', cost: 0, perk: 'Balanced runner', speed: 1 },
@@ -146,7 +153,9 @@ function App() {
   const [activeCharacter, setActiveCharacter] = useState<Character>(CHARACTERS[0]);
   const [characterError, setCharacterError] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setThemeState] = useState<Theme>(loadTheme);
+  const setTheme = (t: Theme) => { setThemeState(t); try { localStorage.setItem(THEME_KEY, t); } catch { /* ignore */ } };
+  const [showSettings, setShowSettings] = useState(false);
   const [wallet, setWallet] = useState<WalletRow | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [showStore, setShowStore] = useState(false);
@@ -199,7 +208,7 @@ function App() {
     if (streak.today) { openMap(); return; }
     const { data } = await supabase.rpc('claim_daily_bonus', { p_player_id: playerId });
     const r = data as { claimed?: boolean; amount?: number; streak?: number } | null;
-    if (r?.claimed) { setDailyBonus({ amount: r.amount ?? 0, streak: r.streak ?? 1 }); fetchWallet(playerId).then((w) => { if (w) setWallet(w); }); setTimeout(() => setDailyBonus(null), 6000); }
+    if (r?.claimed) { setDailyBonus({ amount: r.amount ?? 0, streak: r.streak ?? 1 }); fetchWallet(playerId).then((w) => { if (w) setWallet(w); }); setTimeout(() => setDailyBonus(null), 6000); mascotCheer('streak'); }
     loadStreak();
   };
   const [signups, setSignups] = useState<{ email: string; joined: string; username: string | null }[] | null>(null);
@@ -248,12 +257,15 @@ function App() {
       const ok = await claimQuest(playerId, q.id);
       if (ok) {
         sfx.claim(); haptic([10, 30, 10]); refreshWallet();
-        if (quests.filter((x) => x.id !== q.id).every((x) => x.claimed)) setTimeout(() => setShowChest(true), 450);
+        const last = quests.filter((x) => x.id !== q.id).every((x) => x.claimed);
+        if (last) setTimeout(() => setShowChest(true), 450); else mascotCheer('quest');
       }
     } catch (e) { setQuestError(e instanceof Error ? e.message : 'Could not claim that quest.'); }
     finally { setClaimingQuest(null); }
   };
   const nextLevelReward = progress.unclaimedLevelRewards[0];
+  const prevLevel = useRef(progress.level);
+  useEffect(() => { if (progress.level > prevLevel.current) setTimeout(() => mascotCheer('levelUp'), 600); prevLevel.current = progress.level; }, [progress.level]);
 
   // The player id must follow the ACCOUNT, not the browser/domain. Look up the wallet this
   // account already owns before using a local id, so switching devices or domains never
@@ -526,7 +538,8 @@ function App() {
           </div>
         </div>
         <div className="topbar-actions">
-          <button className="theme-toggle" aria-label={`Switch theme. Current theme: ${theme}`} onClick={() => setTheme(theme === 'dark' ? 'white' : theme === 'white' ? 'red' : 'dark')}><span className="theme-toggle-icon">{theme === 'dark' ? <Moon size={14} /> : theme === 'white' ? <Sun size={14} /> : <Palette size={14} />}</span><span>{theme}</span></button>
+          <button className="theme-toggle" aria-label={`Switch theme. Current theme: ${theme}`} onClick={() => { setTheme(THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length]); sfx.tap(); }}><span className="theme-toggle-icon">{theme === 'dark' ? <Moon size={14} /> : theme === 'white' ? <Sun size={14} /> : theme === 'pink' ? <Heart size={14} /> : <Palette size={14} />}</span><span>{theme === 'white' ? 'light' : theme}</span></button>
+          <button className="icon-button" aria-label="Settings: theme, sounds, Ozone" title="Settings" onClick={() => { setShowSettings(true); setShowMenu(false); setShowNotifications(false); }}><SettingsIcon size={18} /></button>
           <button className="icon-button" aria-label={ambientOn ? 'Turn calming sounds off' : 'Turn calming sounds on'} title="Calming sounds" onClick={toggleAmbient} style={{ fontSize: 16 }}>{ambientOn ? '🔊' : '🔈'}</button><SfxToggle /><button className="icon-button" aria-label="Invite friends" onClick={() => setShowInvite(true)}><Share2 size={18} /></button>
           <button className="icon-button notification-button" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'} aria-expanded={showNotifications} onClick={toggleNotifications}><Bell size={19} />{unreadCount > 0 && <i />}</button>
           <button className="level-chip" onClick={() => setActiveTab('quests')} aria-label={`Level ${progress.level}, ${progress.into} of ${progress.need} XP`}><LevelRing level={progress.level} into={progress.into} need={progress.need} size={34} /><small>LVL {progress.level}<i>{progress.into}/{progress.need} XP</i></small></button>
@@ -534,7 +547,7 @@ function App() {
             <span className="avatar">{(username || session.user.email || '?').charAt(0).toUpperCase()}</span><span className="profile-name">{username ? username.toUpperCase() : 'SET NAME'}</span><ChevronRight size={16} />
           </button>
           {showNotifications && <div className="profile-menu" style={{ width: 280, zIndex: 30 }}><strong>Notifications</strong>{NOTIFICATIONS.map((n) => <div key={n.id} style={{ display: 'grid', gap: 3, paddingTop: 9, borderTop: '1px solid #26343a' }}><b style={{ fontSize: 12, fontWeight: 600 }}>{n.title}</b><span>{n.body}</span></div>)}<button onClick={() => setShowNotifications(false)}>Close</button></div>}
-          {showMenu && <div className="profile-menu" style={{ zIndex: 30 }}><strong>{username || 'Field Operator'}</strong><span>{session.user.email}</span>{!username && <div style={{ display: 'grid', gap: 6, marginTop: 6 }}><span>Pick your field name</span><input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="username" maxLength={20} style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 9, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 12 }} />{nameError && <span style={{ color: '#efad93' }}>{nameError}</span>}<button onClick={saveUsername} disabled={nameSaving}>{nameSaving ? 'Saving…' : 'Save name'}</button></div>}<button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowInvite(true); setShowMenu(false); }}><Share2 size={13} /> Invite friends</button><button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowFriends(true); setShowMenu(false); }}><Users size={13} /> Find friends</button><button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); manageMembership(); }}>Manage membership</button><a href="/terms.html" style={{ fontSize: 12, color: 'inherit', opacity: .8, padding: '4px 0' }}>Terms, privacy &amp; refunds</a>{isAdmin && <button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); openSignups(); }}>📈 Player signups</button>}{isAdmin && <button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); openPayouts(); }}>💸 Payout requests</button>}{isAdmin && <button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); openDrops(); }}>📍 Sponsored drops</button>}<a href="mailto:odrich217@gmail.com?subject=Feature%20my%20business%20on%20Ozone%20Play" style={{ fontSize: 12, color: 'inherit', opacity: .8, padding: '4px 0' }}>⭐ Feature your business</a><button onClick={() => setShowMenu(false)}>Close menu</button></div>}
+          {showMenu && <div className="profile-menu" style={{ zIndex: 30 }}><strong>{username || 'Field Operator'}</strong><span>{session.user.email}</span>{!username && <div style={{ display: 'grid', gap: 6, marginTop: 6 }}><span>Pick your field name</span><input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="username" maxLength={20} style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 9, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 12 }} />{nameError && <span style={{ color: '#efad93' }}>{nameError}</span>}<button onClick={saveUsername} disabled={nameSaving}>{nameSaving ? 'Saving…' : 'Save name'}</button></div>}<button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowInvite(true); setShowMenu(false); }}><Share2 size={13} /> Invite friends</button><button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowFriends(true); setShowMenu(false); }}><Users size={13} /> Find friends</button><button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); setShowSettings(true); }}><SettingsIcon size={13} /> Settings · theme &amp; sounds</button><button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); manageMembership(); }}>Manage membership</button><a href="/terms.html" style={{ fontSize: 12, color: 'inherit', opacity: .8, padding: '4px 0' }}>Terms, privacy &amp; refunds</a>{isAdmin && <button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); openSignups(); }}>📈 Player signups</button>}{isAdmin && <button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); openPayouts(); }}>💸 Payout requests</button>}{isAdmin && <button style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { setShowMenu(false); openDrops(); }}>📍 Sponsored drops</button>}<a href="mailto:odrich217@gmail.com?subject=Feature%20my%20business%20on%20Ozone%20Play" style={{ fontSize: 12, color: 'inherit', opacity: .8, padding: '4px 0' }}>⭐ Feature your business</a><button onClick={() => setShowMenu(false)}>Close menu</button></div>}
         </div>
       </header>
 
@@ -639,8 +652,10 @@ function App() {
       {drops && <div className="store-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#000a', display: 'grid', placeItems: 'center', padding: 16 }} onClick={() => setDrops(null)}><div className="store-modal" onClick={(e) => e.stopPropagation()}><h2>Sponsored drops</h2><p className="store-subtitle">Players get the bonus (cash-eligible) when they check in at the business. Charge the business more than bonus × expected visits.</p><div style={{ display: 'grid', gap: 8 }}><input style={{ width: '100%', boxSizing: 'border-box' as const, padding: '9px 11px', borderRadius: 10, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 13 }} placeholder="Business name" value={dropForm.name} onChange={(e) => setDropForm({ ...dropForm, name: e.target.value })} maxLength={40} /><div style={{ display: 'flex', gap: 8 }}><input style={{ width: '100%', boxSizing: 'border-box' as const, padding: '9px 11px', borderRadius: 10, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 13 }} placeholder="lat, lng (paste from Google Maps)" value={dropForm.coords} onChange={(e) => setDropForm({ ...dropForm, coords: e.target.value })} /><button onClick={useMyCoords}>Here</button></div><div style={{ display: 'flex', gap: 8 }}><label style={{ fontSize: 11, flex: 1 }}>Bonus sparks<input style={{ width: '100%', boxSizing: 'border-box' as const, padding: '9px 11px', borderRadius: 10, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 13 }} type="number" min="1" max="50" value={dropForm.bonus} onChange={(e) => setDropForm({ ...dropForm, bonus: e.target.value })} /></label><label style={{ fontSize: 11, flex: 1 }}>Days<input style={{ width: '100%', boxSizing: 'border-box' as const, padding: '9px 11px', borderRadius: 10, border: '1px solid #34444a', background: '#10181d', color: '#e6eee9', fontSize: 13 }} type="number" min="1" max="365" value={dropForm.days} onChange={(e) => setDropForm({ ...dropForm, days: e.target.value })} /></label></div><button className="primary-button" onClick={createDrop}>Place drop</button></div><div style={{ display: 'grid', gap: 8, marginTop: 14 }}>{drops.length === 0 && <span style={{ fontSize: 12, opacity: .7 }}>No active drops.</span>}{drops.map((d) => <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, borderBottom: '1px solid #2b3a40', paddingBottom: 6 }}><span>⭐ <b>{d.business_name}</b> · +{d.bonus}</span><button onClick={() => endDrop(d.id)}>End</button></div>)}</div><button style={{ marginTop: 16 }} onClick={() => setDrops(null)}>Close</button></div></div>}
       {payouts && <div className="store-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#000a', display: 'grid', placeItems: 'center', padding: 16 }} onClick={() => setPayouts(null)}><div className="store-modal" onClick={(e) => e.stopPropagation()}><h2>Payout requests</h2><p className="store-subtitle">{payouts.filter((p) => p.status === 'pending').length} waiting · ${(payouts.filter((p) => p.status === 'pending').reduce((a, p) => a + p.amount_cents, 0) / 100).toFixed(2)} owed</p><div style={{ display: 'grid', gap: 10 }}>{payouts.length === 0 && <span style={{ fontSize: 12, opacity: .7 }}>No requests yet.</span>}{payouts.map((p) => <div key={p.id} style={{ display: 'grid', gap: 4, fontSize: 12, borderBottom: '1px solid #2b3a40', paddingBottom: 8 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><b>${(p.amount_cents / 100).toFixed(2)} · {p.payout_method === 'paypal' ? 'PayPal' : 'Cash App'}</b><span className={`withdraw-status-badge ${p.status}`}>{p.status}</span></div><span style={{ userSelect: 'all' }}>{p.payout_handle || 'no handle given'}</span><span style={{ opacity: .7 }}>{p.username ? p.username + ' · ' : ''}{p.email} · {new Date(p.created_at).toLocaleDateString()}</span>{p.status === 'pending' && <div style={{ display: 'flex', gap: 8 }}><button className="primary-button" onClick={() => setPayout(p.id, 'paid')}>Mark paid</button><button onClick={() => setPayout(p.id, 'rejected')}>Reject + refund</button></div>}</div>)}</div><button style={{ marginTop: 16 }} onClick={() => setPayouts(null)}>Close</button></div></div>}
       {signups && <div className="store-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#000a', display: 'grid', placeItems: 'center', padding: 16 }} onClick={() => setSignups(null)}><div className="store-modal" onClick={(e) => e.stopPropagation()}><h2>Players · {signups.length}</h2><p className="store-subtitle">{signups.filter((u) => Date.now() - new Date(u.joined).getTime() < 86400000).length} joined in the last 24 h</p><div style={{ display: 'grid', gap: 8 }}>{signups.map((u) => <div key={u.email + u.joined} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, borderBottom: '1px solid #2b3a40', paddingBottom: 6 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.username ? <b>{u.username} </b> : null}{u.email}</span><span style={{ opacity: .7, whiteSpace: 'nowrap' }}>{new Date(u.joined).toLocaleDateString()}</span></div>)}</div><button style={{ marginTop: 16 }} onClick={() => setSignups(null)}>Close</button></div></div>}
-      {showChest && <ChestOverlay onClaim={async () => { const ok = await claimChest(playerId); if (ok) refreshWallet(); return ok; }} onClose={() => setShowChest(false)} />}
+      {showChest && <ChestOverlay onClaim={async () => { const ok = await claimChest(playerId); if (ok) { refreshWallet(); setTimeout(() => mascotCheer('chest'), 900); } return ok; }} onClose={() => setShowChest(false)} />}
       {progress.pendingLevelUp && !showChest && !showGame && !showTemple && !showFloppy && !showNYC && !showMancala && !showDrunk && !showLiveMap && <LevelUpOverlay level={progress.pendingLevelUp} rewardLevel={nextLevelReward} onClaim={async () => { if (!nextLevelReward) return false; const ok = await claimLevelReward(playerId, nextLevelReward); if (ok) refreshWallet(); return ok; }} onClose={dismissLevelUp} />}
+      {showSettings && <SettingsSheet theme={theme} onTheme={setTheme} ambientOn={ambientOn} onToggleAmbient={toggleAmbient} onClose={() => setShowSettings(false)} />}
+      <OzoneMascot username={username} questsLeft={quests.filter((q) => !q.done).length} readyToClaim={quests.filter((q) => q.done && !q.claimed).length} suppressed={showGame || showMancala || showDrunk || showNYC || showTemple || showFloppy || showWalk || showLiveMap || showMenu || showNotifications || showChest || !!progress.pendingLevelUp || !!selectedPoint || showStore || showCharacters || showInvite || showFriends || activeTab !== 'explore' || !!payouts || !!signups || !!drops} />
       {checkoutSuccess && <div className="checkout-toast" onClick={() => setCheckoutSuccess(false)}><CheckCircle2 size={18} /><span>Payment received — sparks credited to your wallet.</span></div>}
     </main>
   );
