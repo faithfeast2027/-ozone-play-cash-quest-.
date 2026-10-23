@@ -52,7 +52,7 @@ const PERSONAS: Record<PersonaId, { name: string; look: string; voice: string }>
 const isPersona = (p: unknown): p is PersonaId => typeof p === 'string' && p in PERSONAS;
 const MAX_CHARS = 800;
 // Tried in order; a 404 (model retired / not enabled for the key) moves to the next one.
-const MODELS = [env.GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-1.5-flash'].filter(Boolean) as string[];
+const MODELS = [env.GEMINI_MODEL, 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-2.0-flash-lite'].filter(Boolean) as string[];
 
 // ---- basic in-memory rate limit (per warm instance; good enough to stop spam loops) ----
 const WINDOW_MS = 60_000;
@@ -169,7 +169,7 @@ async function callGemini(key: string, system: string, contents: ReturnType<type
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
     });
     lastStatus = r.status;
-    if (r.status === 404) continue;
+    if ([404, 429, 500, 503].includes(r.status)) continue; // retired or overloaded: try the next model
     const data = (await r.json().catch(() => ({}))) as {
       candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
       promptFeedback?: { blockReason?: string };
