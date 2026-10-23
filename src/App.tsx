@@ -387,6 +387,7 @@ function App() {
         const [w, p] = await Promise.all([ensureWallet(playerId), fetchProducts()]);
         if (!active) return;
         setWallet(w);
+        if (w.player_id && w.player_id !== playerId) { setActivePlayerId(w.player_id); setPlayerId(w.player_id); }
         setProducts(p);
       } catch (err) {
         console.error('Failed to load wallet or products', err);
