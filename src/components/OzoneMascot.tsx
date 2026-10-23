@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Minus } from 'lucide-react';
+import { Minus, MessageCircle } from 'lucide-react';
 import { prefersReducedMotion } from '@/lib/juice';
 import { sfx, haptic } from '@/lib/sfx';
 import { useMascotSettings, setMascotMinimized, setMascotPos, onMascotMessage, pickLine, TIP_LINES, TAP_LINES, type MascotMood } from '@/lib/mascot';
@@ -10,6 +10,7 @@ type Props = {
   questsLeft: number; // daily quests not yet completed
   readyToClaim: number; // quests done but unclaimed
   suppressed?: boolean; // a game / modal / menu is open
+  onChat?: () => void; // opens the Ozone AI chat (bubble "Chat" chip or long-press)
 };
 
 const BASE_SIZE = 78;
@@ -47,7 +48,7 @@ function nudgeClear(x: number, y: number) {
   return { x, y };
 }
 
-export default function OzoneMascot({ username, questsLeft, readyToClaim, suppressed, level = 1 }: Props) {
+export default function OzoneMascot({ username, questsLeft, readyToClaim, suppressed, level = 1, onChat }: Props) {
   SIZE = mascotSizeForLevel(level);
   const { visible, minimized, pos } = useMascotSettings();
   const reduced = useRef(prefersReducedMotion()).current;
@@ -63,6 +64,9 @@ export default function OzoneMascot({ username, questsLeft, readyToClaim, suppre
   const bubbleTimer = useRef<number | null>(null);
   const drag = useRef<{ id: number; sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
   const tapCount = useRef(0);
+  const longPress = useRef<{ timer: number | null; fired: boolean }>({ timer: null, fired: false });
+  const clearLongPress = () => { if (longPress.current.timer) { window.clearTimeout(longPress.current.timer); longPress.current.timer = null; } };
+  useEffect(() => () => clearLongPress(), []);
 
   // keep position valid on resize / rotation
   useEffect(() => {
@@ -165,18 +169,23 @@ export default function OzoneMascot({ username, questsLeft, readyToClaim, suppre
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     drag.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: xy.x, oy: xy.y, moved: false };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    // long-press (~550ms without dragging) opens the chat; a normal tap keeps its reactions
+    clearLongPress(); longPress.current.fired = false;
+    if (onChat) longPress.current.timer = window.setTimeout(() => { longPress.current.timer = null; if (drag.current && !drag.current.moved) { longPress.current.fired = true; haptic([10, 40, 10]); sfx.mascot('happy'); setBubble(null); onChat(); } }, 550);
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current; if (!d || d.id !== e.pointerId) return;
     const dx = e.clientX - d.sx; const dy = e.clientY - d.sy;
     if (!d.moved && Math.hypot(dx, dy) < 7) return;
-    if (!d.moved) { d.moved = true; setDragging(true); }
+    if (!d.moved) { d.moved = true; setDragging(true); clearLongPress(); }
     const a = freeArea();
     setXy({ x: Math.min(a.maxX, Math.max(a.minX, d.ox + dx)), y: Math.min(window.innerHeight - SIZE - MARGIN, Math.max(a.minY, d.oy + dy)) });
   };
   const onPointerUp = (e: React.PointerEvent) => {
     const d = drag.current; if (!d || d.id !== e.pointerId) return;
     drag.current = null;
+    clearLongPress();
+    if (longPress.current.fired) { longPress.current.fired = false; return; }
     if (!d.moved) { onTap(); return; }
     setDragging(false);
     const next = nudgeClear(xy.x, xy.y);
@@ -209,18 +218,18 @@ export default function OzoneMascot({ username, questsLeft, readyToClaim, suppre
       style={{ transform: `translate3d(${xy.x}px, ${xy.y}px, 0)`, width: SIZE, height: SIZE, transition: 'transform .45s var(--spring, ease), width .6s var(--spring, ease), height .6s var(--spring, ease)' }}
     >
       {bubble && (
-        <div key={bubble.key} className={`oz-bubble ${onLeft ? 'left' : 'right'} ${xy.y < 190 ? 'below' : ''}`} role="status" aria-live="polite">{bubble.text}</div>
+        <div key={bubble.key} className={`oz-bubble ${onLeft ? 'left' : 'right'} ${xy.y < 190 ? 'below' : ''}`} role="status" aria-live="polite">{bubble.text}{onChat && <><br /><button type="button" className="oz-chat-chip" onClick={() => { sfx.tap(); setBubble(null); onChat(); }}><MessageCircle size={12} /> Chat</button></>}</div>
       )}
       {bubble && <button className="oz-hide" aria-label="Minimize Ozone" onClick={() => { setBubble(null); setMascotMinimized(true); }}><Minus size={12} /></button>}
       <div
         className="oz-hit"
         role="button"
         tabIndex={0}
-        aria-label="Ozone, your field buddy. Tap to chat, drag to move."
+        aria-label={onChat ? "Ozone, your field buddy. Tap for a tip, long-press to chat, drag to move." : "Ozone, your field buddy. Tap to chat, drag to move."}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={() => { drag.current = null; setDragging(false); }}
+        onPointerCancel={() => { drag.current = null; clearLongPress(); setDragging(false); }}
         onKeyDown={onKey}
       >
         <div className="oz-float">

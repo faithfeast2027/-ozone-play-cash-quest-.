@@ -1,0 +1,80 @@
+/* ==========================================================================
+   Ozone AI chat sheet. Glass panel matching the app's modals; themed for
+   dark (default), white (light), red, and pink via the .theme-* class on .app-shell.
+   ========================================================================== */
+.app-shell {
+  --ozc-bg: rgba(17, 26, 31, .94); --ozc-line: #34444a; --ozc-text: #e6eee9; --ozc-muted: #8fa0a4;
+  --ozc-accent: #b9f17b; --ozc-accent-fg: #10181d; --ozc-me: #b9f17b; --ozc-me-fg: #10181d;
+  --ozc-oz: rgba(255, 255, 255, .06); --ozc-chip: rgba(185, 241, 123, .1); --ozc-input: #10181d;
+}
+.theme-white { --ozc-bg: rgba(255, 255, 255, .97); --ozc-line: #cbd8d1; --ozc-text: #1b292d; --ozc-muted: #66797a; --ozc-accent: #267448; --ozc-accent-fg: #fff; --ozc-me: #267448; --ozc-me-fg: #fff; --ozc-oz: #f2f7f3; --ozc-chip: #dcefe0; --ozc-input: #f5f9f6; }
+.theme-red { --ozc-bg: rgba(33, 17, 20, .95); --ozc-line: #6a363b; --ozc-text: #f7ede8; --ozc-muted: #c7a7a2; --ozc-accent: #ff947c; --ozc-accent-fg: #2b1112; --ozc-me: #ff9278; --ozc-me-fg: #2b1112; --ozc-oz: #2a171a; --ozc-chip: rgba(255, 148, 124, .12); --ozc-input: #1a0d10; }
+.theme-pink { --ozc-bg: rgba(43, 15, 34, .95); --ozc-line: #7a2f5e; --ozc-text: #fff0f7; --ozc-muted: #e3b0c8; --ozc-accent: #ff4f9a; --ozc-accent-fg: #fff; --ozc-me: linear-gradient(135deg, #ff4f9a, #ff8fbd); --ozc-me-fg: #fff; --ozc-oz: rgba(255, 194, 219, .07); --ozc-chip: rgba(255, 143, 189, .14); --ozc-input: #1d0816; }
+
+.ozc-backdrop { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; padding: 16px; background: #061013aa; -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px); animation: ozc-fade .2s ease both; }
+.ozc-sheet { position: relative; width: min(560px, 100%); height: min(820px, calc(100dvh - 32px)); display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 22px; border: 1px solid var(--ozc-line); background: var(--ozc-bg); color: var(--ozc-text); box-shadow: 0 30px 90px -20px #000c; -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); animation: ozc-up .32s var(--spring, cubic-bezier(.2, .9, .3, 1.2)) both; }
+.theme-pink .ozc-sheet { box-shadow: 0 40px 100px -30px #000, 0 0 60px -30px rgba(255, 79, 154, .6); }
+@media (max-width: 600px) { .ozc-backdrop { padding: 0; } .ozc-sheet { width: 100%; height: 100dvh; border-radius: 0; border: 0; padding: max(12px, env(safe-area-inset-top)) 12px max(10px, env(safe-area-inset-bottom)); } }
+
+.ozc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ozc-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ozc-title h2 { margin: 1px 0 0; font-size: 20px; color: var(--ozc-text); }
+.ozc-title .eyebrow { margin: 0; color: var(--ozc-accent); }
+.ozc-head-actions { display: flex; gap: 6px; }
+.ozc-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--ozc-line); background: var(--ozc-oz); color: var(--ozc-text); cursor: pointer; }
+.ozc-icon:hover { border-color: var(--ozc-accent); }
+
+.ozc-avatar { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--ozc-accent); }
+.ozc-avatar.lg { width: 42px; height: 42px; flex-basis: 42px; box-shadow: 0 0 0 3px var(--ozc-chip); }
+.ozc-avatar.me { display: grid; place-items: center; background: var(--ozc-me); color: var(--ozc-me-fg); font: 800 12px var(--rounded, system-ui); border: 0; }
+
+.ozc-crew { padding: 10px 12px; border-radius: 16px; border: 1px dashed var(--ozc-line); background: var(--ozc-oz); display: grid; gap: 8px; }
+.ozc-crew-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ozc-crew-top strong { display: flex; align-items: center; gap: 6px; font: 800 12px var(--rounded, system-ui); }
+.ozc-crew-top small { color: var(--ozc-muted); font-size: 10px; }
+.ozc-crew-row { display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.ozc-crew-row::-webkit-scrollbar { display: none; }
+.ozc-member { display: grid; justify-items: center; gap: 2px; flex: 0 0 auto; }
+.ozc-member i, .ozc-member img { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 800 12px var(--rounded, system-ui); font-style: normal; object-fit: cover; }
+.ozc-member.me i { background: var(--ozc-me); color: var(--ozc-me-fg); }
+.ozc-member.ozone img { border: 1.5px solid var(--ozc-accent); }
+.ozc-member.empty i { border: 1.5px dashed var(--ozc-line); color: var(--ozc-muted); opacity: .8; }
+.ozc-member small { font-size: 9px; color: var(--ozc-muted); }
+.ozc-invite { margin-left: auto; flex: 0 0 auto; display: flex; align-items: center; gap: 5px; padding: 7px 10px; border-radius: 999px; border: 1px solid var(--ozc-line); background: transparent; color: var(--ozc-muted); font: 700 10px var(--rounded, system-ui); white-space: nowrap; cursor: not-allowed; opacity: .75; }
+
+.ozc-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; overscroll-behavior: contain; }
+.ozc-row { display: flex; align-items: flex-end; gap: 8px; max-width: 88%; animation: ozc-pop .28s var(--spring, ease) both; }
+.ozc-row.me { align-self: flex-end; flex-direction: row-reverse; }
+.ozc-bubble { padding: 9px 12px; border-radius: 16px; font: 500 13.5px/1.45 var(--rounded, system-ui); white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+.ozc-row.oz .ozc-bubble { background: var(--ozc-oz); border: 1px solid var(--ozc-line); border-bottom-left-radius: 5px; color: var(--ozc-text); }
+.ozc-row.me .ozc-bubble { background: var(--ozc-me); color: var(--ozc-me-fg); border-bottom-right-radius: 5px; font-weight: 600; }
+.ozc-row.local .ozc-bubble { border-style: dashed; }
+.ozc-typing { display: flex; gap: 4px; padding: 12px 14px; }
+.ozc-typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--ozc-accent); animation: ozc-dot 1.1s ease-in-out infinite; }
+.ozc-typing i:nth-child(2) { animation-delay: .15s; }
+.ozc-typing i:nth-child(3) { animation-delay: .3s; }
+
+.ozc-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.ozc-chips::-webkit-scrollbar { display: none; }
+.ozc-chips button { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; padding: 8px 11px; border-radius: 999px; border: 1px solid var(--ozc-line); background: var(--ozc-chip); color: var(--ozc-text); font: 700 11.5px var(--rounded, system-ui); cursor: pointer; white-space: nowrap; }
+.ozc-chips button svg { color: var(--ozc-accent); }
+.ozc-chips button:hover { border-color: var(--ozc-accent); }
+
+.ozc-input { display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 12px; border-radius: 18px; border: 1px solid var(--ozc-line); background: var(--ozc-input); }
+.ozc-input:focus-within { border-color: var(--ozc-accent); }
+.ozc-input textarea { flex: 1; resize: none; border: 0; outline: none; background: transparent; color: var(--ozc-text); font: 500 14px/1.4 var(--rounded, system-ui); max-height: 110px; padding: 8px 0; field-sizing: content; }
+.ozc-input textarea::placeholder { color: var(--ozc-muted); }
+.ozc-send { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border-radius: 50%; border: 0; background: var(--ozc-accent); color: var(--ozc-accent-fg); cursor: pointer; transition: transform .15s ease, opacity .15s; }
+.ozc-send:disabled { opacity: .4; cursor: default; }
+.ozc-send:not(:disabled):active { transform: scale(.9); }
+.ozc-foot { text-align: center; font-size: 9.5px; color: var(--ozc-muted); }
+
+/* mascot bubble "Chat" chip (OzoneMascot) */
+.oz-chat-chip { display: inline-flex; align-items: center; gap: 4px; margin-top: 7px; padding: 5px 10px; border-radius: 999px; border: 0; background: var(--oz-accent); color: #10181d; font: 800 11px var(--rounded, system-ui); pointer-events: auto; cursor: pointer; }
+.theme-pink .oz-chat-chip { color: #fff; }
+
+@keyframes ozc-fade { from { opacity: 0; } }
+@keyframes ozc-up { from { opacity: 0; transform: translateY(24px) scale(.98); } }
+@keyframes ozc-pop { from { opacity: 0; transform: translateY(6px) scale(.97); } }
+@keyframes ozc-dot { 0%, 80%, 100% { transform: translateY(0); opacity: .45; } 40% { transform: translateY(-4px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ozc-backdrop, .ozc-sheet, .ozc-row { animation: none; } .ozc-typing i { animation-duration: 2.4s; } }
