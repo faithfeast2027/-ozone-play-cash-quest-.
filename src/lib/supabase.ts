@@ -87,6 +87,23 @@ export async function fetchWallet(playerId: string): Promise<Wallet | null> {
 export async function ensureWallet(playerId: string): Promise<Wallet> {
   const existing = await fetchWallet(playerId);
   if (existing) return existing;
+  // One wallet per account: if this account already owns a wallet, use it instead of
+  // creating a second one for a stale or per-browser id.
+  const { data: { session } } = await supabase.auth.getSession();
+  const uid = session?.user?.id;
+  if (uid) {
+    const { data: owned } = await supabase
+      .from('wallet')
+      .select('id, player_id, sparks, lifetime_sparks, cashable_sparks')
+      .eq('user_id', uid)
+      .order('lifetime_sparks', { ascending: false })
+      .limit(1);
+    if (owned?.[0]) {
+      activePlayerId = owned[0].player_id;
+      localStorage.setItem(`${PLAYER_ID_KEY}_${uid}`, owned[0].player_id);
+      return owned[0] as Wallet;
+    }
+  }
   const { data, error } = await supabase
     .from('wallet')
     .insert({ player_id: playerId, sparks: 0, lifetime_sparks: 0 })
