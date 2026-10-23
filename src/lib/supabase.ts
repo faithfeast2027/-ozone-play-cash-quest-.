@@ -25,7 +25,14 @@ export type Wallet = {
 
 const PLAYER_ID_KEY = 'ozone_player_id';
 
+// The signed-in account's resolved player id. Games and Walk & Earn call
+// getOrCreatePlayerId() with no argument, so they must get the ACCOUNT's wallet id,
+// never a per-browser guest id.
+let activePlayerId: string | null = null;
+export function setActivePlayerId(id: string | null) { activePlayerId = id; }
+
 export function getOrCreatePlayerId(userId?: string): string {
+  if (!userId && activePlayerId) return activePlayerId;
   const storageKey = userId ? `${PLAYER_ID_KEY}_${userId}` : PLAYER_ID_KEY;
   let id = localStorage.getItem(storageKey);
   if (!id) {

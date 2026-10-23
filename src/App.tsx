@@ -43,6 +43,7 @@ import {
   fetchSubscription,
   fetchWallet,
   resolvePlayerId,
+  setActivePlayerId,
   fetchWithdrawals,
   getOrCreatePlayerId,
   requestWithdrawal,
@@ -248,10 +249,10 @@ function App() {
   const [playerId, setPlayerId] = useState('');
   useEffect(() => {
     const uid = session?.user.id;
-    if (!uid) { setPlayerId(getOrCreatePlayerId()); return; }
+    if (!uid) { setActivePlayerId(null); setPlayerId(getOrCreatePlayerId()); return; }
     let on = true;
     setPlayerId('');
-    resolvePlayerId(uid).then((id) => { if (on) setPlayerId(id); }).catch(() => { if (on) setPlayerId(getOrCreatePlayerId(uid)); });
+    resolvePlayerId(uid).then((id) => { if (on) { setActivePlayerId(id); setPlayerId(id); } }).catch(() => { if (on) { const id = getOrCreatePlayerId(uid); setActivePlayerId(id); setPlayerId(id); } });
     return () => { on = false; };
   }, [session?.user.id]);
   const username = getUsername(session?.user);

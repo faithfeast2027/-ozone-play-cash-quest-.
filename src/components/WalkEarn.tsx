@@ -58,6 +58,63 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
   const distRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
   const playerIdRef = useRef(getOrCreatePlayerId());
+  // Keep the screen awake while a walk is tracking, so GPS keeps updating.
+  // Coin "ching ching" every 444 steps.
+  const COIN_EVERY_STEPS = 444;
+  const lastCoinMilestoneRef = useRef(0);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const playChing = () => {
+    try {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return;
+      const ctx = audioCtxRef.current ?? new AC();
+      audioCtxRef.current = ctx;
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const ding = (start: number) => {
+        [1568, 2093, 3136].forEach((freq, i) => {
+          const o = ctx.createOscillator(); const g = ctx.createGain();
+          o.type = i === 0 ? 'square' : 'sine';
+          o.frequency.setValueAtTime(freq, start);
+          g.gain.setValueAtTime(0.0001, start);
+          g.gain.exponentialRampToValueAtTime(i === 0 ? 0.08 : 0.15, start + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
+          o.connect(g).connect(ctx.destination); o.start(start); o.stop(start + 0.4);
+        });
+      };
+      const t = ctx.currentTime;
+      ding(t); ding(t + 0.16);
+      if ('vibrate' in navigator) navigator.vibrate?.([30, 60, 30]);
+    } catch { /* ignore */ }
+  };
+  const [coinPop, setCoinPop] = useState(false);
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+  const wantAwakeRef = useRef(false);
+  const [screenAwake, setScreenAwake] = useState<'on' | 'unsupported' | 'off'>('off');
+  const acquireWakeLock = async () => {
+    wantAwakeRef.current = true;
+    const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void>; addEventListener: (e: string, f: () => void) => void }> } };
+    if (!nav.wakeLock) { setScreenAwake('unsupported'); return; }
+    try {
+      if (wakeLockRef.current) return;
+      const lock = await nav.wakeLock.request('screen');
+      wakeLockRef.current = lock;
+      setScreenAwake('on');
+      lock.addEventListener('release', () => { wakeLockRef.current = null; if (!wantAwakeRef.current) setScreenAwake('off'); });
+    } catch { setScreenAwake('unsupported'); }
+  };
+  const releaseWakeLock = () => {
+    wantAwakeRef.current = false;
+    wakeLockRef.current?.release().catch(() => {});
+    wakeLockRef.current = null;
+    setScreenAwake('off');
+  };
+  useEffect(() => {
+    // Browsers drop the wake lock when the tab is hidden; grab it again when the player comes back.
+    const onVis = () => { if (document.visibilityState === 'visible' && wantAwakeRef.current) acquireWakeLock(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { document.removeEventListener('visibilitychange', onVis); releaseWakeLock(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isMember = subscription?.status === 'active';
   const myTier = TIERS.find((t) => t.id === subscription?.plan) ?? TIERS[0];
@@ -72,6 +129,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
           setSession(active);
           sessionIdRef.current = active.id;
           stepsRef.current = active.steps;
+          lastCoinMilestoneRef.current = Math.floor(active.steps / 444);
           distRef.current = active.distance_m;
           setSteps(active.steps);
           setDistanceM(active.distance_m);
@@ -90,6 +148,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
       watchIdRef.current = null;
     }
     setGpsStatus('idle');
+    releaseWakeLock();
   };
 
   useEffect(() => () => stopGps(), []);
@@ -101,6 +160,8 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
       return;
     }
     setGpsStatus('searching');
+    acquireWakeLock();
+    try { const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext; if (AC && !audioCtxRef.current) audioCtxRef.current = new AC(); audioCtxRef.current?.resume().catch(() => {}); } catch { /* ignore */ }
     if (!session) {
       try {
         const newSession = await startWalkSession();
@@ -125,6 +186,12 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
             stepsRef.current += Math.round(d * STEPS_PER_METER);
             setDistanceM(Math.round(distRef.current));
             setSteps(stepsRef.current);
+            const milestone = Math.floor(stepsRef.current / COIN_EVERY_STEPS);
+            if (milestone > lastCoinMilestoneRef.current) {
+              lastCoinMilestoneRef.current = milestone;
+              playChing();
+              setCoinPop(true); setTimeout(() => setCoinPop(false), 1400);
+            }
             if (sessionIdRef.current) {
               updateWalkSession(sessionIdRef.current, stepsRef.current, Math.round(distRef.current)).catch(() => {});
             }
@@ -157,6 +224,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
     setSession(null);
     sessionIdRef.current = null;
     stepsRef.current = 0;
+    lastCoinMilestoneRef.current = 0;
     distRef.current = 0;
     lastPosRef.current = null;
     setSteps(0);
@@ -245,6 +313,18 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
               {gpsStatus === 'tracking' && 'Live tracking active'}
               {gpsStatus === 'denied' && 'Location permission denied'}
             </div>
+            {coinPop && (
+              <div className="walk-coin-pop" role="status" style={{ textAlign: 'center', fontWeight: 800, fontSize: 18, color: '#f5c542', margin: '4px 0', textShadow: '0 0 12px #f5c54288' }}>
+                🪙 Ching ching! {Math.floor(steps / 444) * 444} steps
+              </div>
+            )}
+            {gpsStatus !== 'idle' && gpsStatus !== 'denied' && (
+              <p className="gps-awake-note" style={{ margin: '6px 2px 10px', fontSize: 11, opacity: .8 }}>
+                {screenAwake === 'on'
+                  ? '🔆 Screen stays on while you walk, so every step counts. Keep this screen open.'
+                  : 'Keep this screen open and your phone unlocked while you walk. Tracking pauses if the screen turns off.'}
+              </p>
+            )}
 
             {session ? (
               <div className="walk-controls">
