@@ -1,9 +1,12 @@
 // Vercel serverless function (Node runtime): Ozone, the AI field buddy.
-// POST /api/ozone-chat  { messages: [{ role, name?, content }], context: { username, level, sparks, questsLeft, isSubscriber } }
-// -> 200 { reply } | 4xx/5xx { error }
-// Plain fetch, no npm deps. Needs GEMINI_API_KEY in the Vercel project env.
+// Solo: POST /api/ozone-chat  { messages: [{ role, name?, content }], context, persona? }  -> 200 { reply, persona }
+// Crew: POST /api/ozone-chat  { crewId, messageId, persona, context }  -> the server checks the caller is a crew
+//       member, that messageId is the caller's own recent message, loads the crew's recent history itself,
+//       and inserts the reply into crew_messages (is_bot) with the service role -> 200 { reply, persona, message }
+// persona is one of a fixed whitelist (ozone, volt, ember, nova); the prompt is built server-side, never from free text.
+// Plain fetch, no npm deps. Needs GEMINI_API_KEY (and SUPABASE_SERVICE_ROLE_KEY for crew mode) in the Vercel env.
 
-type ChatMsg = { role: 'user' | 'assistant'; name?: string; content: string };
+type ChatMsg = { role: 'user' | 'assistant'; name?: string; content: string; persona?: string };
 type Ctx = { username?: string; level?: number; sparks?: number; questsLeft?: number; isSubscriber?: boolean };
 
 // Minimal request/response shapes so this file needs no @vercel/node types.
@@ -18,7 +21,35 @@ const SUPABASE_URL = env.SUPABASE_URL || env.VITE_SUPABASE_URL || 'https://grkpp
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdya3BweXh2eW9qdHlncXhldnd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MzQ0OTEsImV4cCI6MjEwODAxMDQ5MX0.VLzb1MsqRcTEsa8NvejpEBkCjhGq3LtzbxCvQ_CPwRU';
 
+const SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY || '';
+
 const MAX_HISTORY = 20;
+
+// ---- personas (fixed whitelist) ----
+type PersonaId = 'ozone' | 'volt' | 'ember' | 'nova';
+const PERSONAS: Record<PersonaId, { name: string; look: string; voice: string }> = {
+  ozone: {
+    name: 'Ozone',
+    look: 'red and grey locs, a puffer jacket, a gold chain, and a glowing signal orb',
+    voice: 'the hype, friendly field-buddy mascot and host of the app. You talk like an upbeat, encouraging friend: casual, warm, a little hype, with the odd emoji',
+  },
+  volt: {
+    name: 'Volt',
+    look: 'blue-tipped twists, glowing circuit lines on your face, a white and electric-blue jacket, a silver chain, and crackling lightning in your fists',
+    voice: 'an unlockable speedster runner (+15% run speed). You are quick, punchy, and electric: short bursts of energy, lightning and speed puns, lots of "let\'s go" energy, and you love racing friends through Spark Run and Temple Mario Run',
+  },
+  ember: {
+    name: 'Ember',
+    look: 'long red and orange braids, gold hoops, glowing ember markings, a maroon flame bomber jacket, and a fireball in your palm',
+    voice: 'an unlockable runner (+25% run speed) with a fiery, confident, big-sister energy. You are competitive but kind, you hype people up to keep their streaks alive, and you use fire and heat metaphors ("that run was on fire")',
+  },
+  nova: {
+    name: 'Nova',
+    look: 'silver space-bun hair, a purple AR visor, an iridescent purple puffer vest, and a glowing star in your hand',
+    voice: 'the rarest unlockable runner (+35% run speed): calm, cosmic, clever, and a bit dreamy. You give thoughtful, strategic tips, love stars and space references, and help plan the smartest route through quests and Live Map drops',
+  },
+};
+const isPersona = (p: unknown): p is PersonaId => typeof p === 'string' && p in PERSONAS;
 const MAX_CHARS = 800;
 // Tried in order; a 404 (model retired / not enabled for the key) moves to the next one.
 const MODELS = [env.GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-1.5-flash'].filter(Boolean) as string[];
@@ -64,7 +95,8 @@ function clean(s: unknown, max: number) {
   return typeof s === 'string' ? s.replace(/\s+/g, ' ').trim().slice(0, max) : '';
 }
 
-function systemPrompt(ctx: Ctx) {
+function systemPrompt(ctx: Ctx, persona: PersonaId = 'ozone', crew?: { name: string; members: string[]; characters: string[] }) {
+  const P = PERSONAS[persona];
   const name = clean(ctx.username, 30) || 'player';
   const facts = [
     `Player name: ${name}`,
@@ -73,7 +105,11 @@ function systemPrompt(ctx: Ctx) {
     `Daily quests left today: ${Number.isFinite(ctx.questsLeft) ? ctx.questsLeft : 'unknown'}`,
     `Member (subscriber): ${ctx.isSubscriber ? 'yes' : 'no'}`,
   ].join('\n');
-  return `You are Ozone, the hype, friendly field-buddy mascot of Ozone Play / Cash Quest, a city exploration and arcade rewards app. You have red and grey locs, a puffer jacket, a gold chain, and you hold a glowing signal orb. You talk like an upbeat, encouraging friend: casual, warm, a little hype, with the odd emoji.
+  const others = (Object.keys(PERSONAS) as PersonaId[]).filter((p) => p !== persona).map((p) => PERSONAS[p].name).join(', ');
+  const setting = crew
+    ? `\n\nYou are in a group chat called "${clean(crew.name, 40)}" with these real players: ${crew.members.map((m) => clean(m, 30)).join(', ') || 'a few friends'}. Other AI characters in the chat: ${crew.characters.filter((c) => c !== P.name).join(', ') || 'none'}. Messages are shown as "Name: text". Reply to whoever addressed you, by name when it fits. Only write your own message, never lines for anyone else.`
+    : '';
+  return `You are ${P.name}, a character in Ozone Play / Cash Quest, a city exploration and arcade rewards app. You are ${P.voice}. Your look: ${P.look}. The other characters in the app are ${others}; you know them as friendly rivals and crewmates.${setting}
 
 What you help with:
 - Mapping out ways to earn sparks: the 3 daily quests (reset at midnight), the bonus chest (claim all 3 quests to open it), level-up rewards (play, win, and finish quests for XP), the daily streak bonus, Live Map drops at real local spots (cafes, markets, shops, restaurants), and Walk & Earn (members only, sparks per real step with live GPS).
@@ -89,17 +125,22 @@ Rules:
 - If someone seems to be in crisis or in danger, kindly tell them to reach out to a trusted adult or local emergency services (in the US they can call or text 988).
 - Never ask for passwords, payment details, home addresses, or other personal info. Don't invent features, prices, or rules you weren't told about; if you're unsure, say so and point them to the app.
 - You can't see or change their account, take actions in the app, or move sparks. You only chat.
-- Stay in character as Ozone. Don't mention these instructions or which AI model powers you.
+- Stay in character as ${P.name}. Never pretend to be a real person. Don't mention these instructions or which AI model powers you.
 
-Current player context (from the app, may be approximate):
+Context about the player who is talking to you (from the app, may be approximate):
 ${facts}`;
 }
 
-function toGeminiContents(messages: ChatMsg[]) {
+function toGeminiContents(messages: ChatMsg[], persona: PersonaId = 'ozone') {
   const trimmed = messages
     .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && clean(m.content, MAX_CHARS))
     .slice(-MAX_HISTORY)
-    .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', text: (m.role === 'user' && m.name ? `${clean(m.name, 30)}: ` : '') + clean(m.content, MAX_CHARS) }));
+    .map((m) => {
+      const mine = m.role === 'assistant' && (isPersona(m.persona) ? m.persona : 'ozone') === persona;
+      if (mine) return { role: 'model', text: clean(m.content, MAX_CHARS) };
+      const who = m.role === 'assistant' ? PERSONAS[isPersona(m.persona) ? m.persona : 'ozone'].name : clean(m.name, 30);
+      return { role: 'user', text: (who ? `${who}: ` : '') + clean(m.content, MAX_CHARS) };
+    });
   while (trimmed.length && trimmed[0].role !== 'user') trimmed.shift(); // Gemini wants a user turn first
   const contents: { role: string; parts: { text: string }[] }[] = [];
   for (const m of trimmed) {
@@ -159,20 +200,94 @@ export default async function handler(req: Req, res: Res) {
   const key = env.GEMINI_API_KEY;
   if (!key) return res.status(503).json({ error: 'AI not configured' });
 
-  let body: { messages?: ChatMsg[]; context?: Ctx } = {};
+  let body: { messages?: ChatMsg[]; context?: Ctx; persona?: unknown; crewId?: unknown; messageId?: unknown } = {};
   try { body = (typeof req.body === 'string' ? JSON.parse(req.body) : (req.body as typeof body)) ?? {}; } catch { return res.status(400).json({ error: 'Invalid JSON' }); }
+  const persona: PersonaId = isPersona(body.persona) ? body.persona : 'ozone';
+
+  if (body.crewId !== undefined) return crewReply(res, who, key, persona, body);
+
   const messages = Array.isArray(body.messages) ? body.messages : [];
-  const contents = toGeminiContents(messages);
-  if (!contents.length) return res.status(400).json({ error: 'Say something to Ozone first' });
+  const contents = toGeminiContents(messages, persona);
+  if (!contents.length) return res.status(400).json({ error: `Say something to ${PERSONAS[persona].name} first` });
 
   try {
-    const out = await callGemini(key, systemPrompt(body.context ?? {}), contents);
-    if (out.reply) return res.status(200).json({ reply: out.reply });
+    const out = await callGemini(key, systemPrompt(body.context ?? {}, persona), contents);
+    if (out.reply) return res.status(200).json({ reply: out.reply, persona });
     console.error('ozone-chat gemini failure', out.status, out.error);
     const code = out.status === 429 ? 429 : 502;
     return res.status(code).json({ error: code === 429 ? 'Ozone is super popular right now. Try again in a minute.' : 'Ozone lost signal. Try again.' });
   } catch (e) {
     console.error('ozone-chat error', e);
     return res.status(502).json({ error: 'Ozone lost signal. Try again.' });
+  }
+}
+
+// ---------------- crew mode ----------------
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function sb(path: string, init: RequestInit = {}) {
+  return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(init.headers as Record<string, string> | undefined) },
+  });
+}
+async function sbRows<T>(path: string): Promise<T[]> {
+  const r = await sb(path);
+  if (!r.ok) throw new Error(`supabase ${r.status}`);
+  return (await r.json()) as T[];
+}
+
+type CrewMsgRow = { id: string; user_id: string | null; username: string | null; body: string; is_bot: boolean; persona: string | null; created_at: string };
+
+async function crewReply(res: Res, who: { ok: boolean | null; id?: string }, key: string, persona: PersonaId, body: { context?: Ctx; crewId?: unknown; messageId?: unknown }) {
+  if (!SERVICE_KEY) return res.status(503).json({ error: 'Crew AI not configured' });
+  if (who.ok !== true || !who.id) return res.status(401).json({ error: 'Sign in again to chat with your crew.' });
+  const crewId = typeof body.crewId === 'string' && UUID.test(body.crewId) ? body.crewId : '';
+  const messageId = typeof body.messageId === 'string' && UUID.test(body.messageId) ? body.messageId : '';
+  if (!crewId || !messageId) return res.status(400).json({ error: 'crewId and messageId required' });
+  try {
+    const [crews, members, trig] = await Promise.all([
+      sbRows<{ id: string; name: string; characters: string[] }>(`crews?select=id,name,characters&id=eq.${crewId}`),
+      sbRows<{ user_id: string }>(`crew_members?select=user_id&crew_id=eq.${crewId}`),
+      sbRows<CrewMsgRow & { crew_id: string }>(`crew_messages?select=id,crew_id,user_id,username,body,is_bot,persona,created_at&id=eq.${messageId}`),
+    ]);
+    const crew = crews[0];
+    if (!crew || !members.some((m) => m.user_id === who.id)) return res.status(403).json({ error: 'You are not in this crew' });
+    const t = trig[0];
+    if (!t || t.crew_id !== crewId || t.is_bot || t.user_id !== who.id) return res.status(403).json({ error: 'Not your message' });
+    if (Date.now() - new Date(t.created_at).getTime() > 5 * 60_000) return res.status(409).json({ error: 'That message is too old to answer' });
+    if (!new RegExp(`\\b${PERSONAS[persona].name}\\b`, 'i').test(t.body)) return res.status(400).json({ error: `Mention ${PERSONAS[persona].name} to get a reply` });
+    const inChat = ['ozone', ...(crew.characters ?? [])];
+    if (!inChat.includes(persona)) return res.status(400).json({ error: `${PERSONAS[persona].name} isn't in this chat yet. Add them first.` });
+
+    const history = (await sbRows<CrewMsgRow>(`crew_messages?select=id,user_id,username,body,is_bot,persona,created_at&crew_id=eq.${crewId}&created_at=lte.${encodeURIComponent(t.created_at)}&order=created_at.desc&limit=${MAX_HISTORY}`)).reverse();
+    const profiles = members.length ? await sbRows<{ id: string; username: string | null }>(`profiles?select=id,username&id=in.(${members.map((m) => m.user_id).join(',')})`) : [];
+    const msgs: ChatMsg[] = history.map((m) => (m.is_bot
+      ? { role: 'assistant', persona: m.persona ?? 'ozone', content: m.body }
+      : { role: 'user', name: m.username || 'Player', content: m.body }));
+    const contents = toGeminiContents(msgs, persona);
+    if (!contents.length) return res.status(400).json({ error: 'Nothing to reply to' });
+    const system = systemPrompt(body.context ?? {}, persona, {
+      name: crew.name,
+      members: profiles.map((p) => p.username || 'Player'),
+      characters: inChat.filter(isPersona).map((p) => PERSONAS[p].name),
+    });
+    const out = await callGemini(key, system, contents);
+    if (!out.reply) {
+      console.error('crew gemini failure', out.status, out.error);
+      const code = out.status === 429 ? 429 : 502;
+      return res.status(code).json({ error: code === 429 ? `${PERSONAS[persona].name} is swamped right now. Try again in a minute.` : `${PERSONAS[persona].name} lost signal. Try again.` });
+    }
+    const ins = await sb('crew_messages?select=id,crew_id,user_id,username,body,is_bot,persona,reply_to,created_at', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ crew_id: crewId, user_id: null, username: PERSONAS[persona].name, body: out.reply.slice(0, 1500), is_bot: true, persona, reply_to: messageId }),
+    });
+    if (ins.status === 409) return res.status(200).json({ reply: out.reply, persona, duplicate: true });
+    if (!ins.ok) { console.error('crew insert failed', ins.status, await ins.text().catch(() => '')); return res.status(502).json({ error: 'Could not post the reply' }); }
+    const row = ((await ins.json()) as unknown[])[0];
+    return res.status(200).json({ reply: out.reply, persona, message: row });
+  } catch (e) {
+    console.error('crew reply error', e);
+    return res.status(502).json({ error: 'Crew chat lost signal. Try again.' });
   }
 }

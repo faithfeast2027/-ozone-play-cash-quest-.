@@ -1,8 +1,9 @@
-import { X, Palette, Volume2, Music2, Play, Smile } from 'lucide-react';
+import { X, Palette, Volume2, Music2, Play, Smile, Bell, Share } from 'lucide-react';
 import { SOUND_PACKS, previewSoundPack, setSoundPack, setSfxVolume, useSoundSettings, unlockAudio } from '@/lib/sfx';
 import { AMBIENT_TRACKS, getAmbientTrack, setAmbientTrack, type AmbientTrackId } from '@/lib/ambient';
 import { useMascotSettings, setMascotVisible, setMascotMinimized, setMascotPos, mascotSay } from '@/lib/mascot';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { PUSH_CATEGORIES, currentSubscription, disablePush, enablePush, isIOS, isStandalone, loadPrefs, pushSupported, updatePushPrefs, type PushPrefs } from '@/lib/push';
 
 export type Theme = 'dark' | 'white' | 'red' | 'pink';
 export const THEMES: { id: Theme; label: string }[] = [
@@ -19,6 +20,52 @@ type Props = {
 
 function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return <button type="button" className="switch" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} />;
+}
+
+function NotificationsSection() {
+  const [on, setOn] = useState(false);
+  const [prefs, setPrefs] = useState<PushPrefs>(loadPrefs);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const supported = pushSupported();
+  const iosNeedsInstall = isIOS() && !isStandalone();
+  const denied = supported && Notification.permission === 'denied';
+
+  useEffect(() => { currentSubscription().then((s) => setOn(!!s && Notification.permission === 'granted')).catch(() => {}); }, []);
+
+  const toggleMaster = async (v: boolean) => {
+    setBusy(true); setMsg(null);
+    try {
+      if (v) { await enablePush(prefs); setOn(true); setMsg('Notifications are on for this device.'); }
+      else { await disablePush(); setOn(false); setMsg('Notifications are off for this device.'); }
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Could not change notifications.'); }
+    finally { setBusy(false); }
+  };
+  const toggleCat = async (id: keyof PushPrefs, v: boolean) => {
+    const next = { ...prefs, [id]: v };
+    setPrefs(next);
+    try { await updatePushPrefs(next); } catch (e) { setMsg(e instanceof Error ? e.message : 'Could not save.'); }
+  };
+
+  return (
+    <section className="settings-group">
+      <strong><Bell size={15} /> Notifications</strong>
+      {iosNeedsInstall && (
+        <div className="push-hint"><Share size={13} /> <span>On iPhone, <b>Add to Home Screen first</b>: tap Share, then “Add to Home Screen”, open Ozone Play from your Home Screen, and turn notifications on there (iOS 16.4+).</span></div>
+      )}
+      {!supported && !iosNeedsInstall && <small>This browser doesn't support push notifications.</small>}
+      {denied && <small>Notifications are blocked for this site. Allow them in your browser or phone settings, then try again.</small>}
+      <div className="switch-row"><span>Push notifications</span><Switch on={on} onChange={(v) => { if (!busy && supported) toggleMaster(v); }} label="Push notifications" /></div>
+      {PUSH_CATEGORIES.map((c) => (
+        <div key={c.id} className="switch-row" style={{ opacity: on ? 1 : 0.5 }}>
+          <span>{c.label}<small style={{ display: 'block' }}>{c.blurb}</small></span>
+          <Switch on={prefs[c.id]} onChange={(v) => toggleCat(c.id, v)} label={c.label} />
+        </div>
+      ))}
+      {busy && <small>Working…</small>}
+      {msg && <small>{msg}</small>}
+    </section>
+  );
 }
 
 export default function SettingsSheet({ theme, onTheme, ambientOn, onToggleAmbient, onClose }: Props) {
@@ -75,6 +122,8 @@ export default function SettingsSheet({ theme, onTheme, ambientOn, onToggleAmbie
             ))}
           </div>
         </section>
+
+        <NotificationsSection />
 
         <section className="settings-group">
           <strong><Smile size={15} /> Ozone buddy</strong>
