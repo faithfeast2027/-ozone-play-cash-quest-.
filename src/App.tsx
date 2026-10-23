@@ -156,6 +156,18 @@ function App() {
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'ready' | 'denied'>('idle');
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  // Load the signed-in player's membership so subscriber cashouts unlock (refresh when the tab regains focus, e.g. after Stripe checkout).
+  useEffect(() => {
+    const uid = session?.user.id;
+    if (!uid) { setSubscription(null); return; }
+    let on = true;
+    const load = () => { fetchSubscription().then((sub) => { if (on) setSubscription(sub); }).catch(() => {}); };
+    load();
+    const onVis = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', load);
+    return () => { on = false; document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', load); };
+  }, [session?.user.id]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [payoutMethod, setPayoutMethod] = useState('cashapp');

@@ -148,6 +148,8 @@ export async function fetchSubscription(): Promise<Subscription | null> {
   const { data, error } = await supabase
     .from('subscriptions')
     .select('id, status, plan, current_period_end')
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (error) throw error;
   return data;
