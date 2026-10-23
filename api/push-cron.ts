@@ -2,7 +2,7 @@
 // Vercel Cron: automatic pushes. Called by Vercel with Authorization: Bearer $CRON_SECRET.
 // GET /api/push-cron?job=morning  -> daily quests + new drops (quests / drops prefs)
 // GET /api/push-cron?job=streak   -> streak reminder for players who claimed yesterday (ET) but not today
-import { deliver, sb, type PushSub } from './push-send';
+import { deliver, sb, type PushSub } from './push-send.js';
 
 type Req = { method?: string; headers: Record<string, string | string[] | undefined>; query?: Record<string, string | string[]>; url?: string };
 type Res = { status: (code: number) => Res; json: (body: unknown) => void; setHeader: (k: string, v: string) => void };
