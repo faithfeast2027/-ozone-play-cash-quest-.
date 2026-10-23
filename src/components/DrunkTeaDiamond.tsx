@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { reportGameResult } from '@/lib/progress';
+import { sfx, haptic } from '@/lib/sfx';
 import { X, Diamond, Coffee, RotateCcw, Plus, Users, Wine, Skull, Star, Flame, ArrowRight, Crown } from 'lucide-react';
 
 type Props = {
@@ -130,9 +132,13 @@ export default function DrunkTeaDiamond({ onClose }: Props) {
   const cardsLeft = deck.length;
   const round = discards.length;
 
+  const drawnCount = useRef(0);
   const drawCard = useCallback(() => {
     if (cardsLeft === 0) return;
     const [next, ...rest] = deck;
+    sfx.whoosh(); haptic(10);
+    drawnCount.current += 1;
+    if (drawnCount.current === 3) reportGameResult('drunk', 3);
     setDeck(rest);
     setDrawn(next);
     setDiscards((d) => [next, ...d].slice(0, 12));

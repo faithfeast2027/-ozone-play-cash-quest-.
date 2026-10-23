@@ -3,6 +3,7 @@ import maplibregl, { type GeoJSONSource, type StyleSpecification } from 'maplibr
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { X, Crosshair, Layers, MapPin, Sparkles, Loader2, Home, Footprints } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { reportGameResult } from '@/lib/progress';
 
 const CELL = 0.0005; // ~55 m grid
 const PLOT_PRICE = 500;
@@ -212,6 +213,7 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
     if (error) { showToast(false, error.message); return; }
     const r = data as { visitor_reward: number; owner_reward: number; owner_name: string | null; boost_bonus?: number; sponsor_bonus?: number; sponsor_name?: string | null };
     const total = r.visitor_reward + (r.boost_bonus ?? 0) + (r.sponsor_bonus ?? 0);
+    reportGameResult('livemap', total);
     showToast(true, `+${total} sparks for showing up${r.sponsor_bonus ? ` · ${r.sponsor_bonus} bonus from ${r.sponsor_name}` : ''}${r.boost_bonus ? ' · Rush Hour bonus!' : ''}${r.owner_name ? ` · ${r.owner_name} earned ${r.owner_reward}` : ''}`);
     onWalletUpdate(); loadPlots();
   };
