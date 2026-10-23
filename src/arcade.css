@@ -221,3 +221,20 @@
 .walk-card { --card-accent: rgba(185,241,123,.4); }
 .quest-card { isolation: isolate; }
 .large-quest.ready { border-color: rgba(185,241,123,.5); box-shadow: 0 0 30px -8px rgba(185,241,123,.5); }
+
+/* Mobile top bar: fit every control on small screens. Theme + sounds live in Settings there. */
+@media (max-width: 620px) {
+  .topbar { height: auto; min-height: 64px; flex-wrap: wrap; gap: 10px; padding: 10px 0 4px; }
+  .brand-lockup { flex: 1 1 auto; min-width: 0; }
+  .topbar-actions { gap: 6px; flex: 1 1 100%; justify-content: space-between; flex-wrap: nowrap; min-width: 0; }
+  .topbar-actions .theme-toggle, .topbar-actions .ambient-button, .topbar-actions .sfx-toggle { display: none; }
+  .topbar-actions .icon-button { width: 38px; height: 38px; flex: 0 0 auto; }
+  .topbar-actions .level-chip { padding: 2px 8px 2px 2px; flex: 0 0 auto; }
+  .topbar-actions .level-chip small i { display: none; }
+  .topbar-actions .profile-chip { padding: 2px; flex: 0 0 auto; }
+  .topbar-actions .profile-menu { max-width: calc(100vw - 34px); }
+}
+@media (max-width: 360px) {
+  .topbar-actions .level-chip small { display: none; }
+  .topbar-actions .icon-button { width: 34px; height: 34px; }
+}
