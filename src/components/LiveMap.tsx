@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import maplibregl, { type GeoJSONSource, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { X, Crosshair, Layers, MapPin, Sparkles, Loader2, Home, Footprints } from 'lucide-react';
+import { X, Crosshair, Layers, MapPin, Sparkles, Loader2, Home, Footprints, ScanEye } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { reportGameResult } from '@/lib/progress';
+import { unlockAudio } from '@/lib/sfx';
+import ARDrops, { requestOrientationPermission, type ARFix, type CollectResult } from '@/components/ARDrops';
 
 const CELL = 0.0005; // ~55 m grid
 const PLOT_PRICE = 500;
@@ -65,6 +67,7 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [plotName, setPlotName] = useState('');
   const [, force] = useState(0);
+  const [ar, setAr] = useState<null | 'granted' | 'denied' | 'not-needed'>(null);
   const fixRef = useRef<Fix | null>(null);
   fixRef.current = fix;
 
@@ -205,17 +208,30 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
   const standingHere = !!selKey && selKey === myCell;
   const myPlots = [...plotsRef.current.values()].filter((p) => p.owner_id === userId);
 
-  const doCheckIn = async () => {
-    if (!fix) return;
-    setBusy(true);
-    const { data, error } = await supabase.rpc('check_in', { p_lat: fix.lat, p_lng: fix.lng, p_accuracy: fix.acc, p_player_id: playerId });
-    setBusy(false);
-    if (error) { showToast(false, error.message); return; }
+  // Shared by the map's Check in button and the AR view: one check_in RPC, same rewards.
+  const runCheckIn = async (f: Fix | ARFix): Promise<CollectResult> => {
+    const { data, error } = await supabase.rpc('check_in', { p_lat: f.lat, p_lng: f.lng, p_accuracy: f.acc, p_player_id: playerId });
+    if (error) return { ok: false, text: error.message };
     const r = data as { visitor_reward: number; owner_reward: number; owner_name: string | null; boost_bonus?: number; sponsor_bonus?: number; sponsor_name?: string | null };
     const total = r.visitor_reward + (r.boost_bonus ?? 0) + (r.sponsor_bonus ?? 0);
     reportGameResult('livemap', total);
-    showToast(true, `+${total} sparks for showing up${r.sponsor_bonus ? ` · ${r.sponsor_bonus} bonus from ${r.sponsor_name}` : ''}${r.boost_bonus ? ' · Rush Hour bonus!' : ''}${r.owner_name ? ` · ${r.owner_name} earned ${r.owner_reward}` : ''}`);
     onWalletUpdate(); loadPlots();
+    return { ok: true, text: `+${total} sparks for showing up${r.sponsor_bonus ? ` · ${r.sponsor_bonus} bonus from ${r.sponsor_name}` : ''}${r.boost_bonus ? ' · Rush Hour bonus!' : ''}${r.owner_name ? ` · ${r.owner_name} earned ${r.owner_reward}` : ''}` };
+  };
+
+  const doCheckIn = async () => {
+    if (!fix) return;
+    setBusy(true);
+    const res = await runCheckIn(fix);
+    setBusy(false);
+    showToast(res.ok, res.text);
+  };
+
+  // iOS only shows the motion/compass prompt from inside a tap, so ask here before opening AR.
+  const openAR = async () => {
+    unlockAudio();
+    const perm = await requestOrientationPermission();
+    setAr(perm);
   };
 
   const doBoost = async () => {
@@ -248,6 +264,7 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
         <button style={btn} onClick={onClose}><X size={15} /> Close</button>
         <button style={btn} onClick={() => setStyle(style === 'sat' ? '3d' : 'sat')}><Layers size={15} /> {style === 'sat' ? '3D city' : 'Satellite'}</button>
         <button style={btn} onClick={recenter}><Crosshair size={15} /> Me</button>
+        <button style={{ ...btn, color: '#d7b8ff', borderColor: '#b07cff88' }} onClick={openAR}><ScanEye size={15} /> AR</button>
         <span style={{ ...btn, color: '#b9f17b' }}><Sparkles size={14} /> {sparkBalance.toLocaleString()}</span>
       </div>
 
@@ -306,6 +323,8 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
           {myPlots.length > 0 && <small style={{ display: 'block', marginTop: 10, color: '#9badab', fontSize: 11 }}>You own {myPlots.length} plot{myPlots.length > 1 ? 's' : ''} in view.</small>}
         </div>
       )}
+
+      {ar && <ARDrops orientation={ar} onClose={() => setAr(null)} onCollect={(f) => runCheckIn(f)} />}
 
       {toast && (
         <div onClick={() => setToast(null)} style={{ position: 'absolute', left: 14, right: 14, top: 70, zIndex: 4, padding: '12px 14px', borderRadius: 14, background: toast.ok ? '#b9f17b' : '#efad93', color: '#132019', fontSize: 13, fontWeight: 600 }}>{toast.text}</div>
