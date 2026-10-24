@@ -6,6 +6,10 @@ import { supabase } from '@/lib/supabase';
 import { reportGameResult } from '@/lib/progress';
 import { unlockAudio } from '@/lib/sfx';
 import ARDrops, { requestOrientationPermission, type ARFix, type CollectResult } from '@/components/ARDrops';
+import WalkBuddy from '@/components/WalkBuddy';
+import { buddyLine, loadActiveBuddy } from '@/lib/walkBuddy';
+import type { PersonaId } from '@/lib/characters';
+import '@/walk-buddy.css';
 
 const CELL = 0.0005; // ~55 m grid
 const PLOT_PRICE = 500;
@@ -72,8 +76,11 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
   fixRef.current = fix;
 
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null)); }, []);
+  const [buddy, setBuddy] = useState<PersonaId | null>(null);
+  const [buddySay, setBuddySay] = useState<string | null>(null);
+  useEffect(() => { loadActiveBuddy().then((b) => { setBuddy(b); if (b) setBuddySay(buddyLine(b, 'map')); }); }, []);
 
-  const showToast = (ok: boolean, text: string) => { setToast({ ok, text }); window.setTimeout(() => setToast(null), 4200); };
+  const showToast = (ok: boolean, text: string) => { if (buddy && ok) setBuddySay(buddyLine(buddy, 'collect')); setToast({ ok, text }); window.setTimeout(() => setToast(null), 4200); };
 
   const renderLayers = useCallback(() => {
     const map = mapRef.current;
@@ -324,7 +331,9 @@ export default function LiveMap({ onClose, onWalletUpdate, sparkBalance, playerI
         </div>
       )}
 
-      {ar && <ARDrops orientation={ar} onClose={() => setAr(null)} onCollect={(f) => runCheckIn(f)} />}
+      {buddy && !selected && !ar && <WalkBuddy id={buddy} line={buddySay} corner="bottom-left" />}
+
+      {ar && <ARDrops orientation={ar} buddy={buddy} onClose={() => setAr(null)} onCollect={(f) => runCheckIn(f)} />}
 
       {toast && (
         <div onClick={() => setToast(null)} style={{ position: 'absolute', left: 14, right: 14, top: 70, zIndex: 4, padding: '12px 14px', borderRadius: 14, background: toast.ok ? '#b9f17b' : '#efad93', color: '#132019', fontSize: 13, fontWeight: 600 }}>{toast.text}</div>

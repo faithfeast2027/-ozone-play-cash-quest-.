@@ -26,6 +26,10 @@ import {
   type Subscription,
   type WalkSession,
 } from '@/lib/supabase';
+import WalkBuddy from '@/components/WalkBuddy';
+import { CHAT_CHARACTERS, type PersonaId } from '@/lib/characters';
+import { buddyLine, cachedBuddy, loadBuddy, saveBuddy } from '@/lib/walkBuddy';
+import '@/walk-buddy.css';
 
 const STEPS_PER_METER = 1.35;
 const STEPS_PER_SPARK = 100;
@@ -52,6 +56,13 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
   const [distanceM, setDistanceM] = useState(0);
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'searching' | 'tracking' | 'denied'>('idle');
   const [history, setHistory] = useState<WalkSession[]>([]);
+  const [buddy, setBuddy] = useState<PersonaId | null>(cachedBuddy());
+  const [buddySay, setBuddySay] = useState<string | null>(null);
+  const buddyRef = useRef<PersonaId | null>(buddy);
+  buddyRef.current = buddy;
+  const cheer = (m: 'start' | 'milestone' | 'finish' | 'idle') => { if (buddyRef.current) setBuddySay(buddyLine(buddyRef.current, m)); };
+  useEffect(() => { loadBuddy().then((b) => { if (b) setBuddy(b); }).catch(() => {}); }, []);
+  const pickBuddy = (id: PersonaId) => { setBuddy(id); setBuddySay(buddyLine(id, 'idle')); saveBuddy(id).catch(() => setError('Could not save your walk buddy. Try again.')); };
 
   const watchIdRef = useRef<number | null>(null);
   const lastPosRef = useRef<{ lat: number; lon: number; t: number } | null>(null);
@@ -141,6 +152,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
     setGpsStatus('searching');
     acquireWakeLock();
     unlockAudio();
+    cheer('start');
     if (!session) {
       try {
         const newSession = await startWalkSession();
@@ -170,6 +182,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
               lastCoinMilestoneRef.current = milestone;
               playChing();
               setCoinPop(true); setTimeout(() => setCoinPop(false), 1400);
+              cheer('milestone');
             }
             if (sessionIdRef.current) {
               updateWalkSession(sessionIdRef.current, stepsRef.current, Math.round(distRef.current)).catch(() => {});
@@ -188,6 +201,7 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
 
   const finishWalk = async () => {
     stopGps();
+    cheer('finish');
     if (sessionIdRef.current) {
       try {
         const { data, error: bankErr } = await supabase.rpc('bank_walk', { p_session: sessionIdRef.current, p_player_id: playerIdRef.current });
@@ -254,6 +268,12 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
               <Crown size={26} />
               <strong>Walk & Earn is a members-only feature</strong>
               <p>Pick a plan. Earn more, cash out more. Cancel anytime.</p>
+              <div className="buddy-picker" aria-label="Walk buddies, members only">
+                {CHAT_CHARACTERS.map((c) => (
+                  <span key={c.id} className="buddy-pick locked"><img src={c.image} alt={c.name} />{c.name}<small><Lock size={9} /> Members</small></span>
+                ))}
+              </div>
+              <small>Every plan, from $7.99, lets you pick a walk buddy to walk and explore with.</small>
               <div style={{ display: 'grid', gap: 8, width: '100%' }}>
                 {TIERS.map((t) => (
                   <button key={t.id} className={t.id === 'stride' ? 'primary-button full' : 'full'} onClick={() => handleSubscribe(t.id)} disabled={subscribing} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '12px 14px' }}>
@@ -267,6 +287,16 @@ export default function WalkEarn({ onClose, onWalletUpdate }: Props) {
           </div>
         ) : (
           <div className="walk-active">
+            <div className="walk-buddy-section">
+              <strong style={{ fontSize: 13 }}>{buddy ? 'Your walk buddy' : 'Pick your walk buddy'}</strong>
+              <div className="buddy-picker">
+                {CHAT_CHARACTERS.map((c) => (
+                  <button key={c.id} className={`buddy-pick ${buddy === c.id ? 'active' : ''}`} onClick={() => pickBuddy(c.id)}><img src={c.image} alt={c.name} />{c.name}<small>{c.blurb}</small></button>
+                ))}
+              </div>
+              {buddy && <WalkBuddy id={buddy} line={buddySay} corner="inline" />}
+              {buddy && <small style={{ display: 'block', opacity: .7, fontSize: 11, marginBottom: 8 }}>Your buddy cheers you on here, on the Live Map and in AR.</small>}
+            </div>
             <div className="walk-stat-grid">
               <div className="walk-stat">
                 <Footprints size={18} />

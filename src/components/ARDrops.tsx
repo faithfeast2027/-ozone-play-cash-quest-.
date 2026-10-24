@@ -3,6 +3,9 @@ import { X, List, Compass, Loader2, Sparkles, CameraOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { sfx, haptic } from '@/lib/sfx';
 import '@/ar-drops.css';
+import WalkBuddy from '@/components/WalkBuddy';
+import { buddyLine } from '@/lib/walkBuddy';
+import type { PersonaId } from '@/lib/characters';
 
 // Pokémon-Go style "AR" view for Live Map sponsored spark drops.
 // No WebXR: rear camera via getUserMedia + compass (DeviceOrientation) + GPS (watchPosition),
@@ -73,7 +76,8 @@ export async function requestOrientationPermission(): Promise<OrientationPermiss
 
 type Placed = { drop: ARDrop; dist: number; edge: number; brg: number; inRange: boolean };
 
-export default function ARDrops({ onClose, onCollect, orientation }: {
+export default function ARDrops({ onClose, onCollect, orientation, buddy = null }: {
+  buddy?: PersonaId | null;
   onClose: () => void;
   onCollect: (fix: ARFix, drop: ARDrop) => Promise<CollectResult>;
   orientation: OrientationPermission;
@@ -91,6 +95,8 @@ export default function ARDrops({ onClose, onCollect, orientation }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [collected, setCollected] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<CollectResult | null>(null);
+  const [buddySay, setBuddySay] = useState<string | null>(buddy ? buddyLine(buddy, 'ar') : null);
+  useEffect(() => { if (buddy && toast?.ok && /collect|\+\d/i.test(toast.text)) setBuddySay(buddyLine(buddy, 'collect')); }, [toast, buddy]);
   const [burst, setBurst] = useState<{ x: number; y: number; n: number } | null>(null);
   const targetHeading = useRef<number | null>(null);
   const targetPitch = useRef(90);
@@ -348,6 +354,7 @@ export default function ARDrops({ onClose, onCollect, orientation }: {
           {Array.from({ length: 12 }).map((_, i) => <i key={i} style={{ ['--a' as string]: `${i * 30}deg` }} />)}
         </div>
       )}
+      {buddy && !showList && compassOn && <WalkBuddy id={buddy} line={buddySay} corner="bottom-right" compact />}
       {toast && <div className={`ar-toast ${toast.ok ? 'ok' : 'bad'}`} onClick={() => setToast(null)}>{toast.text}</div>}
     </div>
   );
